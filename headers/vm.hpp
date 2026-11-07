@@ -170,10 +170,29 @@ public:
                 }
 
                 // Variables
-                case OpCode::OP_SAVE: {
+                case OpCode::OP_DEFINE_VAR: {
                     uint8_t name_index = bytecode.code[ip++];
                     string var_name = get<string>(bytecode.constants[name_index]);
                     scopes.back()[var_name] = pop();
+                    break;
+                }
+                case OpCode::OP_SAVE: {
+                    uint8_t name_index = bytecode.code[ip++];
+                    string var_name = get<string>(bytecode.constants[name_index]);
+                    Value val = pop();
+                    
+                    bool found = false;
+                    for (int i = scopes.size() - 1; i >= 0; i--) {
+                        if (scopes[i].find(var_name) != scopes[i].end()) {
+                            scopes[i][var_name] = val;
+                            found = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!found) {
+                        scopes.back()[var_name] = val;
+                    }
                     break;
                 }
                 case OpCode::OP_LOAD: {
@@ -191,6 +210,14 @@ public:
                 }
                 case OpCode::OP_POP: {
                     pop();
+                    break;
+                }
+                case OpCode::OP_ENTER_SCOPE: {
+                    scopes.push_back({});
+                    break;
+                }
+                case OpCode::OP_EXIT_SCOPE: {
+                    scopes.pop_back();
                     break;
                 }
 

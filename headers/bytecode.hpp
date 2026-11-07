@@ -37,7 +37,10 @@ enum class OpCode {
     // Vars
     OP_SAVE = 0x10,
     OP_LOAD = 0x11,
-    OP_POP = 0x12,
+    OP_DEFINE_VAR = 0x12,
+    OP_POP = 0x13,
+    OP_ENTER_SCOPE = 0x14,
+    OP_EXIT_SCOPE = 0x15,
 
     // Control Flow
     OP_RETURN = 0x20,
@@ -72,5 +75,11 @@ struct Bytecode
     int add_const(Value val) {
         constants.push_back(val);
         return constants.size() - 1;
+    }
+
+    template <typename... Args> // Function overloading would look a little bit weird there
+    void emit(OpCode op, Args... args) {
+        write(static_cast<uint8_t>(op));
+        (write(static_cast<uint8_t>(args)), ...); // Fold expression (c++17)
     }
 };

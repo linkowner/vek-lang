@@ -156,7 +156,15 @@ public:
                 case '\'': tokens.push_back(scan_char(c)); break;
                 case ',': tokens.push_back(make_token(TokenType::COMMA)); break;
                 case '.': tokens.push_back(make_token(TokenType::DOT)); break;
-                case '=': tokens.push_back(make_token(TokenType::EQUALS)); break;
+                case '=': 
+                    if (peek() == '=') {
+                        next();
+                        tokens.push_back(make_token(TokenType::EQUALS_EQUALS));
+                    } else {
+                        tokens.push_back(make_token(TokenType::EQUALS));
+                    }
+                    break;
+
                 case ';': tokens.push_back(make_token(TokenType::SEMICOLON)); break;
                 case '{': tokens.push_back(make_token(TokenType::LBRACE)); break;
                 case '}': tokens.push_back(make_token(TokenType::RBRACE)); break;
@@ -164,26 +172,53 @@ public:
                 case ']': tokens.push_back(make_token(TokenType::RBRACKET)); break;
                     
                 case ':':
-                    if (peek() == ':') { next(); tokens.push_back(make_token(TokenType::COLON_COLON)); }
-                    else { throw std::runtime_error("Unexpected character ':'"); }
+                    if (peek() == ':') { 
+                        next(); 
+                        tokens.push_back(make_token(TokenType::COLON_COLON)); 
+                    } else { 
+                        throw std::runtime_error("Unexpected character ':'"); 
+                    }
                     break;
                 
                 case '+':
-                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::PLUS_EQUALS)); break; } 
-                    tokens.push_back(make_token(TokenType::PLUS)); 
+                    if (peek() == '=') {
+                        next();
+                        tokens.push_back(make_token(TokenType::PLUS_EQUALS));
+                    } else {
+                        tokens.push_back(make_token(TokenType::PLUS));
+                    }
                     break;
+                    
                 case '-':                     
-                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::MINUS_EQUALS)); break; } 
-                    tokens.push_back(make_token(TokenType::MINUS)); 
+                    if (peek() == '=') {
+                        next();
+                        tokens.push_back(make_token(TokenType::MINUS_EQUALS));
+                    } else {
+                        tokens.push_back(make_token(TokenType::MINUS));
+                    }
                     break;
+                    
                 case '*':                     
-                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::STAR_EQUALS)); break; } 
-                    tokens.push_back(make_token(TokenType::STAR)); 
+                    if (peek() == '=') {
+                        next();
+                        tokens.push_back(make_token(TokenType::STAR_EQUALS));
+                    } else {
+                        tokens.push_back(make_token(TokenType::STAR));
+                    }
                     break;
+                    
                 case '/':
-                    if (peek() == '/') { while(peek() != '\n' && !is_at_end()) next(); break; }
-                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::SLASH_EQUALS)); break; } 
-                    tokens.push_back(make_token(TokenType::SLASH)); 
+                    if (peek() == '/') { 
+                        // Comment
+                        while(peek() != '\n' && !is_at_end()) next(); 
+                    } 
+                    else if (peek() == '=') { 
+                        next(); 
+                        tokens.push_back(make_token(TokenType::SLASH_EQUALS)); 
+                    } 
+                    else { 
+                        tokens.push_back(make_token(TokenType::SLASH)); 
+                    }
                     break;
 
                 case '(': tokens.push_back(make_token(TokenType::LPAREN)); break;

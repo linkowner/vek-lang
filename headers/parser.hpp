@@ -276,7 +276,7 @@ private:
 
     unique_ptr<Expr> parse_expression() {
         auto expr = parse_term();
-        while (match(TokenType::PLUS) || match(TokenType::MINUS) || match(TokenType::GREATER_THAN) || match(TokenType::LESS_THAN)) {
+        while (match(TokenType::PLUS) || match(TokenType::MINUS) || match(TokenType::GREATER_THAN) || match(TokenType::LESS_THAN) || match(TokenType::EQUALS_EQUALS)) {
             TokenType op = previous().type;
             auto right = parse_term();
             expr = make_unique<BinaryExpr>(move(expr), op, move(right));
