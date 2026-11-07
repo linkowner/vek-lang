@@ -22,6 +22,9 @@ inline const unordered_map<std::string, TokenType> keywords = {
     
     {"if", TokenType::IF}, 
     {"else", TokenType::ELSE},
+    {"while", TokenType::WHILE},
+    {"for", TokenType::FOR},
+
     {"print", TokenType::PRINT},
 
     {"int32", TokenType::INT32},
@@ -165,12 +168,22 @@ public:
                     else { throw std::runtime_error("Unexpected character ':'"); }
                     break;
                 
-                case '+': tokens.push_back(make_token(TokenType::PLUS)); break;
-                case '-': tokens.push_back(make_token(TokenType::MINUS)); break;
-                case '*': tokens.push_back(make_token(TokenType::STAR)); break;
+                case '+':
+                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::PLUS_EQUALS)); break; } 
+                    tokens.push_back(make_token(TokenType::PLUS)); 
+                    break;
+                case '-':                     
+                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::MINUS_EQUALS)); break; } 
+                    tokens.push_back(make_token(TokenType::MINUS)); 
+                    break;
+                case '*':                     
+                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::STAR_EQUALS)); break; } 
+                    tokens.push_back(make_token(TokenType::STAR)); 
+                    break;
                 case '/':
-                    if (peek() == '/') { while (peek() != '\n' && !is_at_end()) next(); }
-                    else { tokens.push_back(make_token(TokenType::SLASH)); }
+                    if (peek() == '/') { while(peek() != '\n' && !is_at_end()) next(); break; }
+                    if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::SLASH_EQUALS)); break; } 
+                    tokens.push_back(make_token(TokenType::SLASH)); 
                     break;
 
                 case '(': tokens.push_back(make_token(TokenType::LPAREN)); break;

@@ -27,6 +27,7 @@ private:
     const vector<Token>& tokens;
     size_t current = 0;
 
+    // Helper functions
     bool is_at_end() const { return current >= tokens.size(); }
     bool check(TokenType type) const { return !is_at_end() && tokens[current].type == type; }
     Token previous() const { return tokens[current - 1]; }
@@ -36,6 +37,49 @@ private:
         return tokens[current++];
     }
 
+    // Works just like declaration, but doesn't consumes semicolon
+    unique_ptr<Stmt> parse_for_initializer() {
+        if (check(TokenType::LET) || check(TokenType::CONST)) {
+            bool is_const = match(TokenType::CONST);
+            if (!is_const) consume(TokenType::LET, "Expected 'let'");
+            
+            TokenType type = parse_type();
+            Token name = consume(TokenType::IDENTIFIER, "Expected name");
+            consume(TokenType::EQUALS, "Expected '='");
+            auto init_expr = parse_expression();
+            
+            return make_unique<VarDecl>(type, name.text, false, is_const, nullptr, move(init_expr));
+        }
+        
+        return make_unique<ExprStmt>(parse_expression());
+    }
+    
+    // x += N: x = x + N (WITHOUT SEMICOLON)
+        unique_ptr<Expr> parse_quick_assignment(unique_ptr<Expr> expr) {
+        if (match(TokenType::PLUS_EQUALS) || match(TokenType::MINUS_EQUALS) || 
+            match(TokenType::STAR_EQUALS) || match(TokenType::SLASH_EQUALS)) {
+            
+            TokenType op = previous().type;
+            TokenType math_op;
+
+            if (op == TokenType::PLUS_EQUALS) math_op = TokenType::PLUS;
+            else if (op == TokenType::MINUS_EQUALS) math_op = TokenType::MINUS;
+            else if (op == TokenType::STAR_EQUALS) math_op = TokenType::STAR;
+            else math_op = TokenType::SLASH;
+
+            auto value = parse_expression();
+
+            auto* var_target = dynamic_cast<VariableExpr*>(expr.get());
+            if (!var_target) {
+                throw std::runtime_error("Invalid target for compound assignment");
+            }
+
+            return make_unique<AssignExpr>(var_target->name, math_op, move(value));
+        }
+        return expr;
+    }
+
+    // Parsing
     unique_ptr<Stmt> parse_statement() {
         if (check(TokenType::LET) || check(TokenType::CONST)) {
             return parse_declaration();
@@ -43,7 +87,9 @@ private:
         
         if (check(TokenType::FUNC)) return parse_function();
         if (check(TokenType::IF)) return parse_if();
-        
+        if (check(TokenType::WHILE)) return parse_while();
+        if (check(TokenType::FOR)) return parse_for();
+
         if (match(TokenType::PRINT)) {
             consume(TokenType::LPAREN, "Expected '(' after 'print'");
             auto expr = parse_expression();
@@ -63,13 +109,20 @@ private:
         if (check(TokenType::LBRACE)) return parse_block();
 
         auto expr = parse_expression();
+        auto quick_assign = parse_quick_assignment(move(expr));
+
+        if (dynamic_cast<AssignExpr*>(quick_assign.get())) {
+            consume(TokenType::SEMICOLON, "Expected ';'");
+            return make_unique<ExprStmt>(move(quick_assign));
+        }
+        
         if (match(TokenType::EQUALS)) {
             auto value = parse_expression();
             consume(TokenType::SEMICOLON, "Expected ';'");
-            return make_unique<AssignStmt>(move(expr), move(value));
+            return make_unique<AssignStmt>(move(quick_assign), move(value));
         }
         if (match(TokenType::SEMICOLON)) {
-            return make_unique<ExprStmt>(move(expr));
+            return make_unique<ExprStmt>(move(quick_assign));
         }
         throw std::runtime_error("Parsing failed");
     }
@@ -77,7 +130,9 @@ private:
     unique_ptr<Stmt> parse_block() {
         consume(TokenType::LBRACE, "Expected '{'");
         vector<unique_ptr<Stmt>> body;
-        while (!check(TokenType::RBRACE) && !is_at_end()) body.push_back(parse_statement());
+        while (!check(TokenType::RBRACE) && !is_at_end()) 
+            body.push_back(parse_statement());
+
         consume(TokenType::RBRACE, "Expected '}'");
         return make_unique<BlockStmt>(move(body));
     }
@@ -100,6 +155,53 @@ private:
         }
 
         return make_unique<IfStmt>(move(condition), move(then_branch), move(else_branch));
+    }
+
+    unique_ptr<Stmt> parse_while() {
+        consume(TokenType::WHILE, "Expected 'while'");
+        consume(TokenType::LPAREN, "Expected '('");
+        auto condition = parse_expression();
+        consume(TokenType::RPAREN, "Expected ')'");
+        
+        // Body
+        auto while_branch = parse_block();
+        return make_unique<WhileStmt>(move(condition), move(while_branch));
+    }
+
+    unique_ptr<Stmt> parse_for() {
+        consume(TokenType::FOR, "Expected 'for'");
+        consume(TokenType::LPAREN, "Expected '('");
+        
+        // Index
+        unique_ptr<Stmt> initializer = nullptr;
+        if (!check(TokenType::SEMICOLON)) {
+            if (check(TokenType::LET) || check(TokenType::CONST)) {
+                initializer = parse_for_initializer(); 
+            } else {
+                auto expr = parse_expression();
+                initializer = make_unique<ExprStmt>(move(expr));
+            }
+        } 
+        consume(TokenType::SEMICOLON, "Expected ';' after loop initializer");
+
+        // Condition
+        unique_ptr<Expr> condition = nullptr;
+        if (!check(TokenType::SEMICOLON)) {
+            condition = parse_expression();
+        }
+        consume(TokenType::SEMICOLON, "Expected ';' after loop condition");
+
+        // Increment
+        unique_ptr<Expr> increment = nullptr;
+        if (!check(TokenType::RPAREN)) {
+            auto expr = parse_expression();
+            increment = parse_quick_assignment(move(expr));
+        }
+        consume(TokenType::RPAREN, "Expected ')' after 'for'");
+
+        // Body
+        auto body = parse_block();
+        return make_unique<ForStmt>(move(initializer), move(condition), move(increment), move(body));
     }
 
     unique_ptr<Stmt> parse_function() {
@@ -174,7 +276,7 @@ private:
 
     unique_ptr<Expr> parse_expression() {
         auto expr = parse_term();
-        while (match(TokenType::PLUS) || match(TokenType::MINUS) || match(TokenType::GREATER_THAN) || match(TokenType::LESS_THAN)) { // Added comparisons
+        while (match(TokenType::PLUS) || match(TokenType::MINUS) || match(TokenType::GREATER_THAN) || match(TokenType::LESS_THAN)) {
             TokenType op = previous().type;
             auto right = parse_term();
             expr = make_unique<BinaryExpr>(move(expr), op, move(right));
@@ -241,6 +343,15 @@ private:
             return make_unique<Float32Literal>(std::stof(text));
         }
         
+        if (match(TokenType::MINUS)) {
+            auto expr = parse_primary();
+            return make_unique<BinaryExpr>(
+                make_unique<Int64Literal>(0),
+                TokenType::MINUS,
+                move(expr)
+            );
+        }
+
         if (match(TokenType::BOOL_LITERAL)) return make_unique<BoolLiteral>(previous().text == "true");
         if (match(TokenType::STR_LITERAL)) return make_unique<StringLiteral>(previous().text);
         if (match(TokenType::CHAR_LITERAL)) return make_unique<CharLiteral>(previous().text[0]);

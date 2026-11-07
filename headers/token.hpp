@@ -12,7 +12,9 @@ struct SourceLocation {
 
 enum class TokenType {
     // Basic
-    LET, CONST, FUNC, IF, ELSE, PRINT,
+    LET, CONST, FUNC, 
+    IF, ELSE, WHILE, FOR,    
+    PRINT,
     
     // Declaration types
     INT32, INT64, FLOAT32, FLOAT64, 
@@ -24,6 +26,7 @@ enum class TokenType {
 
     // Math
     EQUALS, PLUS, MINUS, STAR, SLASH,
+    PLUS_EQUALS, MINUS_EQUALS, STAR_EQUALS, SLASH_EQUALS,
     
     // Logic
     NOT, GREATER_THAN, LESS_THAN, GREATER_EQUAL, LESS_EQUAL, RET,

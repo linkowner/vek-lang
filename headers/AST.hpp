@@ -25,6 +25,15 @@ struct VariableExpr : Expr {
     VariableExpr(string n) : name(move(n)) {}
 };
 
+struct AssignExpr : Expr {
+    string name;
+    TokenType op;
+    unique_ptr<Expr> value;
+
+    AssignExpr(string n, TokenType o, unique_ptr<Expr> v)
+        : name(move(n)), op(o), value(move(v)) {}
+};
+
 struct ArrayAccessExpr : Expr {
     unique_ptr<Expr> array;
     unique_ptr<Expr> index;
@@ -98,6 +107,24 @@ struct IfStmt : Stmt {
     unique_ptr<Stmt> else_branch;
     IfStmt(unique_ptr<Expr> cond, unique_ptr<Stmt> then_b, unique_ptr<Stmt> else_b)
         : condition(move(cond)), then_branch(move(then_b)), else_branch(move(else_b)) {}
+};
+
+struct WhileStmt : Stmt {
+    unique_ptr<Expr> condition;
+    unique_ptr<Stmt> body;
+
+    WhileStmt(unique_ptr<Expr> cond, unique_ptr<Stmt> b)
+        : condition(move(cond)), body(move(b)) {}
+};
+
+struct ForStmt : Stmt {
+    unique_ptr<Stmt> initializer;
+    unique_ptr<Expr> condition;
+    unique_ptr<Expr> increment;
+    unique_ptr<Stmt> body;
+
+    ForStmt(unique_ptr<Stmt> init, unique_ptr<Expr> cond, unique_ptr<Expr> inc, unique_ptr<Stmt> b)
+        : initializer(move(init)), condition(move(cond)), increment(move(inc)), body(move(b)) {}
 };
 
 struct Param {
