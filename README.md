@@ -13,8 +13,8 @@
 - [x] If/Else Control Flow
 - [x] Functions & Scopes
 - [x] Dynamic Arrays (`push`, `pop`, indexing)
+- [x] `while` and `for` loops
 - [ ] `&&` and `||`
-- [ ] `while` and `for` loops
 - [ ] Structs / Classes
 - [ ] String manipulation methods (`.length()`, `.split()`)
   
@@ -76,7 +76,7 @@ func main() int {
 ## TODO
 - [ ] Organize src .cpp files instead of using .hpp only.
 - [ ] Add classes.
-- [ ] Implement while/for loops.
+- [x] Implement while/for loops.
 - [ ] Organize the code.
 - [ ] CMake file.
 - [ ] Compiler and VM supposed to be different things. (_vekvm {filename}.vekbc_ to run, _vek run/build_ - developer tool) (turn .vekbc is a bytecode file, with magic, 3 bytes in header.)
