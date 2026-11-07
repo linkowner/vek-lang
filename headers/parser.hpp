@@ -55,7 +55,7 @@ private:
     }
     
     // x += N: x = x + N (WITHOUT SEMICOLON)
-        unique_ptr<Expr> parse_quick_assignment(unique_ptr<Expr> expr) {
+    unique_ptr<Expr> parse_quick_assignment(unique_ptr<Expr> expr) {
         if (match(TokenType::PLUS_EQUALS) || match(TokenType::MINUS_EQUALS) || 
             match(TokenType::STAR_EQUALS) || match(TokenType::SLASH_EQUALS)) {
             
@@ -136,7 +136,7 @@ private:
         consume(TokenType::RBRACE, "Expected '}'");
         return make_unique<BlockStmt>(move(body));
     }
-
+    
     unique_ptr<Stmt> parse_if() {
         consume(TokenType::IF, "Expected 'if'");
         consume(TokenType::LPAREN, "Expected '('");
