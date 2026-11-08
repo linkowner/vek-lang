@@ -7,7 +7,10 @@
 **Vek** is a fast, statically-typed, bytecode-compiled programming language with its own custom stack-based Virtual Machine (similar to Java and the JVM). 
 It is designed to be simple, bridging the syntax of C++ and Java with some of the flexibility seen in JavaScript.
 
-Compile using `g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm`
+Compile using :
+```bash
+    g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
+```
 
 [![Download VekLang](https://img.shields.io/badge/Download-v0.0.1-green?style=for-the-badge&logo=windows)](https://github.com/vek-language/vek-lang/releases/latest)  
 ---

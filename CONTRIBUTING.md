@@ -16,8 +16,7 @@ First off, thank you for considering contributing to VekLang! It's people like y
 3. Make your changes.
 4. Compile and test your changes locally:
 ```bash
-    g++ main.cpp -o vek
-    ./vek test.vek
+    g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
 ```
 5. Commit your changes.
 6. Push to the branch.
