@@ -33,7 +33,7 @@ inline const unordered_map<std::string, TokenType> keywords = {
 
     {"float32", TokenType::FLOAT32},
     {"float64", TokenType::FLOAT64},
-    {"float", TokenType::FLOAT32},
+    {"float", TokenType::FLOAT64},
     
     {"str", TokenType::STR},
     {"char", TokenType::CHAR},

@@ -292,6 +292,13 @@ private:
     // Expr compiler
     Type compile_expr(Expr* expr, Bytecode& bytecode, Type expected_type = Type::UNKNOWN) {
         if (auto* i64 = dynamic_cast<Int64Literal*>(expr)) {
+            if (expected_type == Type::INT32) {
+                int idx = bytecode.add_const(static_cast<int32_t>(i64->value));
+                bytecode.emit(OpCode::OP_CONSTANT, idx);
+                return Type::INT32;
+            }
+
+            // fallback to 64 bits
             int idx = bytecode.add_const(static_cast<int64_t>(i64->value));
             bytecode.emit(OpCode::OP_CONSTANT, idx);
             return Type::INT64;
@@ -450,7 +457,7 @@ private:
                     bytecode.emit(OpCode::OP_EQUAL); 
                     bytecode.emit(OpCode::OP_NOT); 
                     break;
-                    
+
                 default: throw std::runtime_error("Unknown binary operator");
             }
             return result_type;
