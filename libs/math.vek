@@ -2,7 +2,13 @@
 # Standard Math Library for VekLang
 
 // Constants
-const float PI = 3.14159;
+const float PI = 3.14159;const float64 PI = 3.141592653589793;
+const float64 E = 2.718281828459045;
+const float64 TAU = 6.283185307179586; // PI * 2
+
+// Physics / General Math
+const float64 INF = 1.0 / 0.0; // Infinity
+const float64 NAN = 0.0 / 0.0; // Not A Number
 
 // Rounding
 func floor(float num) int {

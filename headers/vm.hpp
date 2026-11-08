@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <cmath>
 #include <vector>
 #include <stdexcept>
 #include <string>
@@ -47,7 +48,12 @@ private:
         if (holds_alternative<int32_t>(v)) return std::to_string(get<int32_t>(v));
         if (holds_alternative<int64_t>(v)) return std::to_string(get<int64_t>(v));
         if (holds_alternative<float>(v)) return std::to_string(get<float>(v));
-        if (holds_alternative<double>(v)) return std::to_string(get<double>(v));
+        if (holds_alternative<double>(v)) {
+            double d = get<double>(v);
+            if (std::isinf(d)) return d > 0 ? "inf" : "-inf";
+            if (std::isnan(d)) return "nan";
+            return std::to_string(d);
+        }
         if (holds_alternative<shared_ptr<ArrayObject>>(v)) {
             auto arr = get<shared_ptr<ArrayObject>>(v);
             if (!arr) return "null";
@@ -144,8 +150,16 @@ public:
                 case OpCode::OP_DIVIDE: {
                     Value b = pop(); Value a = pop();
                     MathValues mv = extract_math_operands(a, b, "DIVIDE");
-                    if (mv.is_float) push(mv.f_left / mv.f_right);
-                    else push(mv.i_left / mv.i_right);
+                    if (mv.is_float) {
+                        // Float division (returns inf/nan)
+                        push(mv.f_left / mv.f_right);
+                    } else {
+                        // Integer division
+                        if (mv.i_right == 0) {
+                            throw runtime_error("Division by zero");
+                        }
+                        push(mv.i_left / mv.i_right);
+                    }
                     break;
                 }
 
