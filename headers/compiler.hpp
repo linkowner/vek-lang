@@ -1,8 +1,3 @@
-/*
-    Lot's of section headers just for visual 
-    0's are placeholders
-*/
-
 #pragma once
 
 #include <iostream>
@@ -13,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include "ast.hpp"
 #include "bytecode.hpp"
 #include "token.hpp"
@@ -22,6 +18,7 @@ using std::vector;
 using std::unique_ptr;
 using std::string;
 using std::unordered_map;
+using std::unordered_set;
 
 enum class Type { INT32, INT64, FLOAT32, FLOAT64, BOOL, CHAR, STR, VOID, ARRAY, UNKNOWN };
 
@@ -33,7 +30,9 @@ private:
     vector<unordered_map<string, Type>> variable_scopes;
     vector<unordered_map<string, bool>> constant_scopes;
 
-    vector<string> loaded_files;
+    unordered_map<string, vector<unique_ptr<Stmt>>> parsed_modules;
+    unordered_set<string> registered_modules;
+    unordered_set<string> emitted_modules;
 
     // Scope helpers
     void push_scope() { 
@@ -45,8 +44,9 @@ private:
         constant_scopes.pop_back();
     }
     Type get_var_type(const string& name) {
-        for (int i = variable_scopes.size() - 1; i >= 0; i--) {
-            if (variable_scopes[i].count(name)) return variable_scopes[i][name];
+        for (int i = (int)variable_scopes.size() - 1; i >= 0; i--) {
+            auto it = variable_scopes[i].find(name);
+            if (it != variable_scopes[i].end()) return it->second;
         }
         return Type::UNKNOWN;
     }
@@ -54,8 +54,9 @@ private:
         variable_scopes.back()[name] = type; 
     }
     bool is_constant(const string& name) {
-        for (int i = constant_scopes.size() - 1; i >= 0; i--) {
-            if (constant_scopes[i].count(name)) return constant_scopes[i][name];
+        for (int i = (int)constant_scopes.size() - 1; i >= 0; i--) {
+            auto it = constant_scopes[i].find(name);
+            if (it != constant_scopes[i].end()) return it->second;
         }
         return false;
     }
@@ -96,30 +97,22 @@ private:
     bool is_numeric(Type t) { return t == Type::INT32 || t == Type::INT64 || t == Type::FLOAT32 || t == Type::FLOAT64; }
     bool is_assignable(Type target, Type source) { return target == source || (is_numeric(target) && is_numeric(source)); }
 
-    // Backpatch jump address
     void patch_jump(Bytecode& bytecode, size_t jump_index, size_t target) {
         bytecode.code[jump_index] = (target >> 8) & 0xFF;
         bytecode.code[jump_index + 1] = target & 0xFF;
     }
 
-    // Load compile
-    void compile_load(LoadStmt* stmt, Bytecode& bytecode) {
-        string full_path = stmt->filepath;
+    // Module loading
+    string resolve_load_path(LoadStmt* stmt) {
+        if (stmt->is_stdlib) return "libs/" + stmt->filepath + ".vek";
+        return stmt->filepath + ".vek";
+    }
 
-        // Add ".vek" extension
-        if (stmt->is_stdlib) {
-            full_path = "libs/" + full_path + ".vek";
-        } else {
-            full_path = full_path + ".vek";
-        }
+    void parse_and_register_module(LoadStmt* stmt) {
+        string full_path = resolve_load_path(stmt);
+        if (registered_modules.count(full_path)) return;
+        registered_modules.insert(full_path);
 
-        // Already loaded current file?
-        for (const auto& file : loaded_files) {
-            if (file == full_path) return; 
-        }
-        loaded_files.push_back(full_path);
-
-        // Read the file
         std::ifstream file(full_path);
         if (!file.is_open()) {
             throw runtime_error("Could not find module: " + stmt->filepath);
@@ -132,9 +125,14 @@ private:
         Parser parser(tokens);
         auto program = parser.parse_program();
 
-        // Register funcs
-        for (const auto& loaded_stmt : program) {
-            if (auto* func = dynamic_cast<FuncDecl*>(loaded_stmt.get())) {
+        for (const auto& s : program) {
+            if (auto* load = dynamic_cast<LoadStmt*>(s.get())) {
+                parse_and_register_module(load);
+            }
+        }
+
+        for (const auto& s : program) {
+            if (auto* func = dynamic_cast<FuncDecl*>(s.get())) {
                 if (func->name == "main") {
                     throw runtime_error("Modules cannot define 'main'.");
                 }
@@ -143,13 +141,47 @@ private:
             }
         }
 
-        // Compile the funcs
-        for (const auto& loaded_stmt : program) {
-            compile_stmt(loaded_stmt.get(), bytecode);
+        parsed_modules[full_path] = std::move(program);
+    }
+
+    void emit_module_globals(LoadStmt* stmt, Bytecode& bytecode) {
+        string full_path = resolve_load_path(stmt);
+        parse_and_register_module(stmt);
+
+        if (emitted_modules.count(full_path)) return;
+        emitted_modules.insert(full_path);
+
+        const auto& program = parsed_modules[full_path];
+
+        for (const auto& s : program) {
+            if (auto* load = dynamic_cast<LoadStmt*>(s.get())) {
+                emit_module_globals(load, bytecode);
+            }
+        }
+
+        for (const auto& s : program) {
+            if (dynamic_cast<FuncDecl*>(s.get()) || dynamic_cast<LoadStmt*>(s.get())) continue;
+            compile_stmt(s.get(), bytecode);
         }
     }
 
-    // Control Flow
+    void emit_function_body(FuncDecl* func, Bytecode& bytecode) {
+        bytecode.function_addresses[func->name] = bytecode.code.size();
+        
+        push_scope();
+        for (const auto& param : func->params) {
+            int name_idx = bytecode.add_const(param.name);
+            bytecode.emit(OpCode::OP_DEFINE_VAR, name_idx);
+            set_var_type(param.name, token_to_type(param.type));
+        }
+        
+        for (const auto& body_stmt : func->body) {
+            compile_stmt(body_stmt.get(), bytecode);
+        }
+        pop_scope();
+    }
+
+    // Control flow
     void compile_if(IfStmt* stmt, Bytecode& bytecode) {
         compile_expr(stmt->condition.get(), bytecode, Type::BOOL);
             
@@ -219,7 +251,7 @@ private:
         pop_scope();
     }
 
-    // Statement Compilers
+    // Statements
     void compile_var_decl(VarDecl* var_decl, Bytecode& bytecode) {
         Type declared_type = token_to_type(var_decl->type);
         set_var_type(var_decl->name, var_decl->is_array ? Type::ARRAY : declared_type);
@@ -321,7 +353,7 @@ private:
             return;
         }
 
-        if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt)) { compile_load(load_stmt, bytecode); return; }
+        if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt)) { emit_module_globals(load_stmt, bytecode); return; }
         if (auto* if_stmt = dynamic_cast<IfStmt*>(stmt)) { compile_if(if_stmt, bytecode); return; }
         if (auto* while_stmt = dynamic_cast<WhileStmt*>(stmt)) { compile_while(while_stmt, bytecode); return; }
         if (auto* for_stmt = dynamic_cast<ForStmt*>(stmt)) { compile_for(for_stmt, bytecode); return; }
@@ -331,23 +363,7 @@ private:
         if (auto* print_stmt = dynamic_cast<PrintStmt*>(stmt)) { compile_print(print_stmt, bytecode); return; }
         if (auto* ret_stmt = dynamic_cast<ReturnStmt*>(stmt)) { compile_return(ret_stmt, bytecode); return; }
 
-
-        if (auto* func = dynamic_cast<FuncDecl*>(stmt)) {
-            bytecode.function_addresses[func->name] = bytecode.code.size();
-            
-            push_scope();
-            for (const auto& param : func->params) {
-                int name_idx = bytecode.add_const(param.name);
-                bytecode.emit(OpCode::OP_DEFINE_VAR, name_idx);
-                set_var_type(param.name, token_to_type(param.type));
-            }
-            
-            for (const auto& body_stmt : func->body) {
-                compile_stmt(body_stmt.get(), bytecode);
-            }
-            pop_scope();
-            return;
-        }
+        if (auto* func = dynamic_cast<FuncDecl*>(stmt)) { emit_function_body(func, bytecode); return; }
 
         if (auto* expr_stmt = dynamic_cast<ExprStmt*>(stmt)) {
             compile_expr(expr_stmt->expression.get(), bytecode, Type::UNKNOWN);
@@ -360,7 +376,7 @@ private:
         throw runtime_error("Unknown statement type");
     }
 
-    // Expr compiler
+    // Expressions
     Type compile_expr(Expr* expr, Bytecode& bytecode, Type expected_type = Type::UNKNOWN) {
         if (auto* i64 = dynamic_cast<Int64Literal*>(expr)) {
             if (expected_type == Type::INT32) {
@@ -369,7 +385,6 @@ private:
                 return Type::INT32;
             }
 
-            // fallback to 64 bits
             int idx = bytecode.add_const(static_cast<int64_t>(i64->value));
             bytecode.emit(OpCode::OP_CONSTANT, idx);
             return Type::INT64;
@@ -586,30 +601,43 @@ public:
         Bytecode bytecode;
         push_scope();
 
-        // Register functions in the main file
+        // Register functions
         for (const auto& stmt : program) {
             if (auto* func = dynamic_cast<FuncDecl*>(stmt.get())) {
                 functions[func->name] = func;
                 function_return_types[func->name] = token_to_type(func->return_type);
             }
+            if (auto* load = dynamic_cast<LoadStmt*>(stmt.get())) {
+                parse_and_register_module(load);
+            }
         }
 
-        // Emit the jump
+        // Compile globals
+        for (const auto& stmt : program) {
+            if (dynamic_cast<FuncDecl*>(stmt.get())) continue;
+            compile_stmt(stmt.get(), bytecode);
+        }
+
+        // Jump over functions
         bytecode.emit(OpCode::OP_JUMP, 0, 0);
         size_t jump_placeholder = bytecode.code.size() - 2;
 
         // Compile non-main functions
+        unordered_set<string> emitted_funcs;
         for (const auto& stmt : program) {
             if (auto* func = dynamic_cast<FuncDecl*>(stmt.get())) {
                 if (func->name == "main") continue;
-                compile_stmt(stmt.get(), bytecode);
+                emit_function_body(func, bytecode);
+                emitted_funcs.insert(func->name);
             }
         }
-
-        // Process loads
-        for (const auto& stmt : program) {
-            if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt.get())) {
-                compile_load(load_stmt, bytecode);
+        for (auto& [path, mod_program] : parsed_modules) {
+            for (const auto& s : mod_program) {
+                if (auto* func = dynamic_cast<FuncDecl*>(s.get())) {
+                    if (emitted_funcs.count(func->name)) continue;
+                    emit_function_body(func, bytecode);
+                    emitted_funcs.insert(func->name);
+                }
             }
         }
 
@@ -622,7 +650,7 @@ public:
         bytecode.code[jump_placeholder] = (main_addr >> 8) & 0xFF;
         bytecode.code[jump_placeholder + 1] = main_addr & 0xFF;
 
-        // Compile main
+        // Compile main body
         for (const auto& stmt : functions["main"]->body) {
             compile_stmt(stmt.get(), bytecode);
         }

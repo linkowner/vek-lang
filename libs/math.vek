@@ -1,8 +1,10 @@
 # Math.vek
 # Standard Math Library for VekLang
 
-// Rounding
+// Constants
+const float PI = 3.14159;
 
+// Rounding
 func floor(float num) int {
     let int truncated = (int)num;
     if (num < 0.0 && num != (float)truncated) {
@@ -27,7 +29,6 @@ func round(float num) int {
 }
 
 // Basic Math
-
 func abs(int num) int {
     if (num < 0) {
         ret -num;
@@ -46,7 +47,6 @@ func max(int a, int b) int {
 }
 
 // Power & Square Root
-
 func pow(int num, int power) int {
     let int result = 1;
     for (let int i = 0; i < power; i += 1) {
