@@ -1,5 +1,7 @@
-# VekLang
+![VekLang Banner](https://repository-images.githubusercontent.com/1445189670/8c10a523-9cf8-4c74-96d8-c500ca53ff34)
+---
 
+# VekLang
 ![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)
 ![Language](https://img.shields.io/badge/Language-C%2B%2B17-purple.svg)
 ![Type](https://img.shields.io/badge/Type-Bytecode%20VM-success.svg)
@@ -9,7 +11,7 @@ It is designed to be simple, bridging the syntax of C++ and Java with some of th
 
 Compile using :
 ```bash
-    g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
+g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
 ```
 
 [![Download VekLang](https://img.shields.io/badge/Download-v0.0.1-green?style=for-the-badge&logo=windows)](https://github.com/vek-language/vek-lang/releases/latest)  
