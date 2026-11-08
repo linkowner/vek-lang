@@ -151,10 +151,10 @@ public:
                     Value b = pop(); Value a = pop();
                     MathValues mv = extract_math_operands(a, b, "DIVIDE");
                     if (mv.is_float) {
-                        // Float division (returns inf/nan)
+                        // Float
                         push(mv.f_left / mv.f_right);
                     } else {
-                        // Integer division
+                        // Integer
                         if (mv.i_right == 0) {
                             throw runtime_error("Division by zero");
                         }
