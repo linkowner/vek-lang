@@ -8,6 +8,7 @@ Use `let` for variables and `const` for values that must not be reassigned. Supp
 
 ```cpp
 let int count = 3;
+let float int_to_float = (float)count;
 const str label = "Vek";
 let int scores[] = {90, 45, 85};
 scores.push(100);
