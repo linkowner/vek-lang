@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cout << "Usage: vekvm <file.vekbc>\n";
+        std::cout << "Usage: vekvm <file.vkc>\n";
         return 1;
     }
 

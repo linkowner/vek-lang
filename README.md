@@ -18,7 +18,7 @@ g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
 ---
 ![Demo](https://github.com/user-attachments/assets/4cc4a84d-66de-484e-90d9-a2a4c8d13456)
 ---
-You can see the docs [here](https://github.com/vek-language/vek-lang/tree/main/docs).
+You can see the docs [here](https://github.com/vek-language/vek-lang/tree/mavin/docs).
 
 ### Language Features
 - [x] Variables & Math

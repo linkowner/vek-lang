@@ -16,7 +16,7 @@ using std::ifstream;
 using std::holds_alternative;
 
 /*
-    .vekbc File Format
+    .vkc File Format
     ------------------
     [4 bytes] Magic Number ("VEKL")
     [4 bytes] Code size (uint32)

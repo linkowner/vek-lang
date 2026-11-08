@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         if (command == "build") {
             // Save to a .vekbc
             fs::path p(path);
-            std::string out_path = p.stem().string() + ".vekbc";
+            std::string out_path = p.stem().string() + ".vkc";
 
             Serializer::save(bytecode, out_path);
             std::cout << "Successfully compiled to " << out_path << "\n";
