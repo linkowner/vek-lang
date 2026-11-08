@@ -9,7 +9,8 @@ It is designed to be simple, bridging the syntax of C++ and Java with some of th
 
 Compile using `g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm`
 
-[![Download VekLang](https://img.shields.io/badge/Download-v0.1.0-blue?style=for-the-badge&logo=windows)](https://github.com/vek-language/vek-lang/releases/latest)
+[![Download VekLang](https://img.shields.io/badge/Download-v0.0.-blue?style=for-the-badge&logo=windows)](https://github.com/vek-language/vek-lang/releases/latest)  
+---
 ![Demo](https://github.com/user-attachments/assets/4cc4a84d-66de-484e-90d9-a2a4c8d13456)
 ---
 You can see the docs [here](https://github.com/vek-language/vek-lang/tree/main/docs).
