@@ -17,12 +17,14 @@ You can see the docs [here](https://github.com/vek-language/vek-lang/tree/main/d
 - [x] Functions & Scopes
 - [x] Dynamic Arrays (`push`, `pop`, indexing)
 - [x] `while` and `for` loops
-- [ ] `&&` and `||`
+- [x] `&&` and `||`
 - [ ] Structs / Classes
 - [ ] String manipulation methods (`.length()`, `.split()`)
   
 **Code that shows capabilities (run with `./main {filename}.vek`)**
 ```cpp
+load math; // loads std lib "math" (use quotes for user module)
+
 func calculate_bonus(int score, int bonus_points) int {
     if (score > 80) {
         ret score + bonus_points;
@@ -66,7 +68,6 @@ func main() int {
 - [ ] Organize src .cpp files instead of using .hpp only.
 - [ ] Add classes.
 - [x] Implement while/for loops.
-- [ ] Organize the code.
 - [ ] CMake file.
 - [ ] Compiler and VM supposed to be different things. (_vekvm {filename}.vekbc_ to run, _vek run/build_ - developer tool) (turn .vekbc is a bytecode file, with magic, 3 bytes in header.)
 
