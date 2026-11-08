@@ -276,7 +276,15 @@ private:
 
     unique_ptr<Expr> parse_expression() {
         auto expr = parse_term();
-        while (match(TokenType::PLUS) || match(TokenType::MINUS) || match(TokenType::GREATER_THAN) || match(TokenType::LESS_THAN) || match(TokenType::EQUALS_EQUALS)) {
+        while (match(TokenType::PLUS) 
+            || match(TokenType::MINUS) 
+            || match(TokenType::GREATER_THAN)
+            || match(TokenType::LESS_THAN) 
+            || match(TokenType::GREATER_EQUAL)
+            || match(TokenType::LESS_EQUAL)
+            || match(TokenType::EQUALS_EQUALS) 
+            || match(TokenType::NOT_EQUALS))
+        {
             TokenType op = previous().type;
             auto right = parse_term();
             expr = make_unique<BinaryExpr>(move(expr), op, move(right));
@@ -323,6 +331,24 @@ private:
     }
 
     unique_ptr<Expr> parse_primary() {
+        if (match(TokenType::NOT)) {
+            TokenType op = previous().type;
+            auto right = parse_primary();
+            
+            return make_unique<UnaryExpr>(op, move(right));
+        }
+
+        if (match(TokenType::MINUS)) {
+            auto expr = parse_primary();
+            
+            // turns into `0 - number`
+            return make_unique<BinaryExpr>(
+                make_unique<Int64Literal>(0),
+                TokenType::MINUS,
+                move(expr)
+            );
+        }
+        
         if (match(TokenType::INT64_LITERAL)) {
             return make_unique<Int64Literal>(std::stoll(previous().text));
         }

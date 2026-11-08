@@ -32,7 +32,10 @@ enum class OpCode {
     // Logic
     OP_GREATER_THAN = 0x06,
     OP_LESS_THAN = 0x07,
-    OP_EQUAL = 0x08,
+    OP_GREATER_EQUAL = 0x08,
+    OP_LESS_EQUAL = 0x09,
+    OP_EQUAL = 0x0A,
+    OP_NOT = 0x0B,
 
     // Vars
     OP_SAVE = 0x10,

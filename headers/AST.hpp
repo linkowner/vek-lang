@@ -34,6 +34,12 @@ struct AssignExpr : Expr {
         : name(move(n)), op(o), value(move(v)) {}
 };
 
+struct UnaryExpr : Expr {
+    TokenType op;
+    unique_ptr<Expr> right;
+    UnaryExpr(TokenType o, unique_ptr<Expr> r) : op(o), right(move(r)) {}
+};
+
 struct ArrayAccessExpr : Expr {
     unique_ptr<Expr> array;
     unique_ptr<Expr> index;

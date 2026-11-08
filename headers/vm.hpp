@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #include <vector>
 #include <stdexcept>
@@ -72,7 +73,7 @@ private:
             return holds_alternative<int32_t>(v) || holds_alternative<int64_t>(v) ||
                    holds_alternative<float>(v) || holds_alternative<double>(v); 
         };
-        if (!is_num(a) || !is_num(b)) throw std::runtime_error("Operands must be numbers: " + op_name);
+        if (!is_num(a) || !is_num(b)) throw std::runtime_error("Operands must be numbers: " + op_name); // op_name for debugging
 
         if (holds_alternative<float>(a) || holds_alternative<double>(a) || 
             holds_alternative<float>(b) || holds_alternative<double>(b)) {
@@ -115,6 +116,7 @@ public:
                 // Math
                 case OpCode::OP_ADD: {
                     Value b = pop(); Value a = pop();
+                    // strings & chars
                     if (holds_alternative<string>(a) || holds_alternative<string>(b) || holds_alternative<char>(a) || holds_alternative<char>(b)) {
                         push(value_to_string(a) + value_to_string(b));
                     } else {
@@ -154,6 +156,7 @@ public:
                     else push(mv.i_left > mv.i_right);
                     break;
                 }
+
                 case OpCode::OP_LESS_THAN: {
                     Value b = pop(); Value a = pop();
                     MathValues mv = extract_math_operands(a, b, "LESS_THAN");
@@ -161,11 +164,61 @@ public:
                     else push(mv.i_left < mv.i_right);
                     break;
                 }
+
+                case OpCode::OP_GREATER_EQUAL: {
+                    Value b = pop(); Value a = pop();
+                    MathValues mv = extract_math_operands(a, b, "GREATER_EQUAL");
+                    if (mv.is_float) push(mv.f_left >= mv.f_right);
+                    else push(mv.i_left >= mv.i_right);
+                    break;
+                }
+                case OpCode::OP_LESS_EQUAL: {
+                    Value b = pop(); Value a = pop();
+                    MathValues mv = extract_math_operands(a, b, "LESS_EQUAL");
+                    if (mv.is_float) push(mv.f_left <= mv.f_right);
+                    else push(mv.i_left <= mv.i_right);
+                    break;
+                }
+
                 case OpCode::OP_EQUAL: {
                     Value b = pop(); Value a = pop();
-                    MathValues mv = extract_math_operands(a, b, "EQUAL");
-                    if (mv.is_float) push(mv.f_left == mv.f_right);
-                    else push(mv.i_left == mv.i_right);
+                    
+                    // strings
+                    if (holds_alternative<string>(a) && holds_alternative<string>(b)) {
+                        push(get<string>(a) == get<string>(b));
+                    }
+                    // chars
+                    else if (holds_alternative<char>(a) && holds_alternative<char>(b)) {
+                        push(get<char>(a) == get<char>(b));
+                    }
+                    // bools
+                    else if (holds_alternative<bool>(a) && holds_alternative<bool>(b)) {
+                        push(get<bool>(a) == get<bool>(b));
+                    }
+                    // numbers
+                    else {
+                        MathValues mv = extract_math_operands(a, b, "EQUAL");
+                        if (mv.is_float) push(mv.f_left == mv.f_right);
+                        else push(mv.i_left == mv.i_right);
+                    }
+                    break;
+                }
+
+                case OpCode::OP_NOT: {
+                    Value a = pop();
+                    bool truthy = false;
+                    
+                    if (holds_alternative<bool>(a)) {
+                        truthy = get<bool>(a);
+                    } else if (holds_alternative<int64_t>(a)) {
+                        truthy = (get<int64_t>(a) != 0);
+                    } else if (holds_alternative<double>(a)) {
+                        truthy = (get<double>(a) != 0.0);
+                    } else {
+                        truthy = true;
+                    }
+                    
+                    push(!truthy);
                     break;
                 }
 

@@ -378,10 +378,37 @@ private:
             return function_return_types.count(call->name) ? function_return_types[call->name] : Type::UNKNOWN;
         }
 
+        if (auto* unary = dynamic_cast<UnaryExpr*>(expr)) {
+            compile_expr(unary->right.get(), bytecode, Type::UNKNOWN);
+            if (unary->op == TokenType::NOT) {
+                bytecode.emit(OpCode::OP_NOT);
+            }
+            return Type::BOOL;
+        }
+
         if (auto* bin = dynamic_cast<BinaryExpr*>(expr)) {
             Type left_type = compile_expr(bin->left.get(), bytecode, expected_type);
             Type right_type = compile_expr(bin->right.get(), bytecode, expected_type);
             
+            Type result_type = Type::UNKNOWN;
+            if (is_numeric(left_type) && is_numeric(right_type)) {
+                if (left_type == Type::FLOAT64 || right_type == Type::FLOAT64) {
+                    result_type = Type::FLOAT64;
+                } 
+                else if (left_type == Type::FLOAT32 || right_type == Type::FLOAT32) {
+                    result_type = Type::FLOAT32;
+                } 
+                else if (left_type == Type::INT64 || right_type == Type::INT64) {
+                    result_type = Type::INT64;
+                } 
+                else {
+                    result_type = Type::INT32; 
+                }
+            } 
+            else if (left_type == Type::STR && right_type == Type::STR && bin->op == TokenType::PLUS) {
+                result_type = Type::STR;
+            }
+
             if (bin->op == TokenType::PLUS) {
                 bool is_valid_string = (left_type == Type::STR && right_type == Type::STR);
                 bool is_valid_number = (is_numeric(left_type) && is_numeric(right_type));
@@ -390,23 +417,43 @@ private:
                     throw std::runtime_error("Cannot add " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
             } 
+            else if (bin->op == TokenType::EQUALS_EQUALS || bin->op == TokenType::NOT_EQUALS) {
+                bool is_valid_number = (is_numeric(left_type) && is_numeric(right_type));
+                bool is_valid_string = (left_type == Type::STR && right_type == Type::STR);
+                bool is_valid_char = (left_type == Type::CHAR && right_type == Type::CHAR);
+                bool is_valid_bool = (left_type == Type::BOOL && right_type == Type::BOOL);
+
+                if (!is_valid_number && !is_valid_string && !is_valid_char && !is_valid_bool) {
+                    throw std::runtime_error("Cannot compare " + type_to_string(left_type) + " and " + type_to_string(right_type));
+                }
+                
+                result_type = Type::BOOL;
+            }
             else {
                 if (!is_numeric(left_type) || !is_numeric(right_type)) {
                     throw std::runtime_error("Math operations require numbers, got " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
+                result_type = Type::BOOL; 
             }
 
             switch (bin->op) {
-                case TokenType::PLUS:  bytecode.emit(OpCode::OP_ADD); break;
+                case TokenType::PLUS: bytecode.emit(OpCode::OP_ADD); break;
                 case TokenType::MINUS: bytecode.emit(OpCode::OP_SUBTRACT); break;
-                case TokenType::STAR:  bytecode.emit(OpCode::OP_MULTIPLY); break;
+                case TokenType::STAR: bytecode.emit(OpCode::OP_MULTIPLY); break;
                 case TokenType::SLASH: bytecode.emit(OpCode::OP_DIVIDE); break;
                 case TokenType::GREATER_THAN: bytecode.emit(OpCode::OP_GREATER_THAN); break;
                 case TokenType::LESS_THAN: bytecode.emit(OpCode::OP_LESS_THAN); break;
+                case TokenType::GREATER_EQUAL: bytecode.emit(OpCode::OP_GREATER_EQUAL); break;
+                case TokenType::LESS_EQUAL: bytecode.emit(OpCode::OP_LESS_EQUAL); break;
                 case TokenType::EQUALS_EQUALS: bytecode.emit(OpCode::OP_EQUAL); break;
+                case TokenType::NOT_EQUALS: 
+                    bytecode.emit(OpCode::OP_EQUAL); 
+                    bytecode.emit(OpCode::OP_NOT); 
+                    break;
+                    
                 default: throw std::runtime_error("Unknown binary operator");
             }
-            return Type::UNKNOWN;
+            return result_type;
         }
         throw std::runtime_error("Unknown expression type");
     }

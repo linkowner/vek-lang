@@ -14,7 +14,7 @@ enum class TokenType {
     // Basic
     LET, CONST, FUNC, 
     IF, ELSE, WHILE, FOR,    
-    PRINT,
+    PRINT, RET,
     
     // Declaration types
     INT32, INT64, FLOAT32, FLOAT64, 
@@ -29,7 +29,10 @@ enum class TokenType {
     PLUS_EQUALS, MINUS_EQUALS, STAR_EQUALS, SLASH_EQUALS,
     
     // Logic
-    NOT, GREATER_THAN, LESS_THAN, GREATER_EQUAL, LESS_EQUAL, EQUALS_EQUALS, RET,
+    NOT, NOT_EQUALS, 
+    GREATER_THAN, LESS_THAN, 
+    GREATER_EQUAL, LESS_EQUAL, 
+    EQUALS_EQUALS, 
 
     // Parens & Braces
     LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET, DOT,

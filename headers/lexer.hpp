@@ -223,7 +223,14 @@ public:
 
                 case '(': tokens.push_back(make_token(TokenType::LPAREN)); break;
                 case ')': tokens.push_back(make_token(TokenType::RPAREN)); break;
-                case '!': tokens.push_back(make_token(TokenType::NOT)); break;
+                case '!':
+                    if (peek() == '=') {
+                        next();
+                        tokens.push_back(make_token(TokenType::NOT_EQUALS));
+                    } else {
+                        tokens.push_back(make_token(TokenType::NOT));
+                    }
+                break;
                 
                 case '>':
                     if (peek() == '=') { next(); tokens.push_back(make_token(TokenType::GREATER_EQUAL)); }
