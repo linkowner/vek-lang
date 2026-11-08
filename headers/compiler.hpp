@@ -6,6 +6,8 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <vector>
 #include <memory>
 #include <stdexcept>
@@ -15,6 +17,7 @@
 #include "bytecode.hpp"
 #include "token.hpp"
 
+using std::runtime_error;
 using std::vector;
 using std::unique_ptr;
 using std::string;
@@ -119,7 +122,7 @@ private:
         // Read the file
         std::ifstream file(full_path);
         if (!file.is_open()) {
-            throw std::runtime_error("Could not find module: " + stmt->filepath);
+            throw runtime_error("Could not find module: " + stmt->filepath);
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
@@ -133,7 +136,7 @@ private:
         for (const auto& loaded_stmt : program) {
             if (auto* func = dynamic_cast<FuncDecl*>(loaded_stmt.get())) {
                 if (func->name == "main") {
-                    throw std::runtime_error("Modules cannot define 'main'.");
+                    throw runtime_error("Modules cannot define 'main'.");
                 }
                 functions[func->name] = func;
                 function_return_types[func->name] = token_to_type(func->return_type);
@@ -261,7 +264,7 @@ private:
             }
 
             if (!handled) {
-                throw std::runtime_error("Array size error. Provide [N] or an initializer.");
+                throw runtime_error("Array size error. Provide [N] or an initializer.");
             }
         } else {
             compile_expr(var_decl->initializer.get(), bytecode, declared_type);
@@ -273,7 +276,7 @@ private:
     void compile_assign(AssignStmt* assign_stmt, Bytecode& bytecode) {
         if (auto* var = dynamic_cast<VariableExpr*>(assign_stmt->target.get())) {
             if (is_constant(var->name)) {
-                throw std::runtime_error("Cannot reassign constant variable '" + var->name + "'");
+                throw runtime_error("Cannot reassign constant variable '" + var->name + "'");
             }
 
             Type target_type = get_var_type(var->name);
@@ -286,7 +289,7 @@ private:
             compile_expr(assign_stmt->value.get(), bytecode);
             bytecode.emit(OpCode::OP_SET_INDEX);
         } else {
-            throw std::runtime_error("Invalid assignment target");
+            throw runtime_error("Invalid assignment target");
         }
     }
 
@@ -354,7 +357,7 @@ private:
             return;
         }
         
-        throw std::runtime_error("Unknown statement type");
+        throw runtime_error("Unknown statement type");
     }
 
     // Expr compiler
@@ -413,7 +416,7 @@ private:
                 case TokenType::MINUS: bytecode.emit(OpCode::OP_SUBTRACT); break;
                 case TokenType::STAR:  bytecode.emit(OpCode::OP_MULTIPLY); break;
                 case TokenType::SLASH: bytecode.emit(OpCode::OP_DIVIDE); break;
-                default: throw std::runtime_error("Invalid assignment operator");
+                default: throw runtime_error("Invalid assignment operator");
             }
 
             bytecode.emit(OpCode::OP_SAVE, load_idx);
@@ -433,15 +436,15 @@ private:
                 compile_expr(arg.get(), bytecode, Type::UNKNOWN);
             }
             if (method_call->method == "push") {
-                if (method_call->arguments.size() != 1) throw std::runtime_error("push expects 1 argument");
+                if (method_call->arguments.size() != 1) throw runtime_error("push expects 1 argument");
                 bytecode.emit(OpCode::OP_ARRAY_PUSH);
             } 
             else if (method_call->method == "pop") {
-                if (!method_call->arguments.empty()) throw std::runtime_error("pop expects 0 arguments");
+                if (!method_call->arguments.empty()) throw runtime_error("pop expects 0 arguments");
                 bytecode.emit(OpCode::OP_ARRAY_POP);
             } 
             else {
-                throw std::runtime_error("Unknown array method: " + method_call->method);
+                throw runtime_error("Unknown array method: " + method_call->method);
             }
             return Type::UNKNOWN;
         }
@@ -525,7 +528,7 @@ private:
                 bool is_valid_number = (is_numeric(left_type) && is_numeric(right_type));
                 
                 if (!is_valid_string && !is_valid_number) {
-                    throw std::runtime_error("Cannot add " + type_to_string(left_type) + " and " + type_to_string(right_type));
+                    throw runtime_error("Cannot add " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
             } 
             else if (bin->op == TokenType::EQUALS_EQUALS || bin->op == TokenType::NOT_EQUALS) {
@@ -535,14 +538,14 @@ private:
                 bool is_valid_bool = (left_type == Type::BOOL && right_type == Type::BOOL);
 
                 if (!is_valid_number && !is_valid_string && !is_valid_char && !is_valid_bool) {
-                    throw std::runtime_error("Cannot compare " + type_to_string(left_type) + " and " + type_to_string(right_type));
+                    throw runtime_error("Cannot compare " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
                 
                 result_type = Type::BOOL;
             }
             else {
                 if (!is_numeric(left_type) || !is_numeric(right_type)) {
-                    throw std::runtime_error("Math operations require numbers, got " + type_to_string(left_type) + " and " + type_to_string(right_type));
+                    throw runtime_error("Math operations require numbers, got " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
                 
                 if (left_type == Type::FLOAT64 || right_type == Type::FLOAT64) {
@@ -571,11 +574,11 @@ private:
                     bytecode.emit(OpCode::OP_NOT); 
                     break;
 
-                default: throw std::runtime_error("Unknown binary operator");
+                default: throw runtime_error("Unknown binary operator");
             }
             return result_type;
         }
-        throw std::runtime_error("Unknown expression type");
+        throw runtime_error("Unknown expression type");
     }
 
 public:
@@ -612,7 +615,7 @@ public:
 
         // Patch jump to main
         if (functions.find("main") == functions.end()) {
-            throw std::runtime_error("No 'main' function found.");
+            throw runtime_error("No 'main' function found.");
         }
         uint16_t main_addr = (uint16_t)bytecode.code.size();
         bytecode.function_addresses["main"] = main_addr;

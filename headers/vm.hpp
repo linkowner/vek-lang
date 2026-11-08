@@ -10,6 +10,7 @@
 #include "bytecode.hpp"
 #include "token.hpp"
 
+using std::runtime_error;
 using std::vector;
 using std::string;
 using std::get;
@@ -27,12 +28,12 @@ private:
     vector<size_t> call_stack;
 
     void push(Value val) {
-        if (stack.size() >= STACK_SIZE) throw std::runtime_error("Stack overflow!");
+        if (stack.size() >= STACK_SIZE) throw runtime_error("Stack overflow!");
         stack.push_back(val);
     }
 
     Value pop() {
-        if (stack.empty()) throw std::runtime_error("Stack underflow!");
+        if (stack.empty()) throw runtime_error("Stack underflow!");
         Value val = stack.back();
         stack.pop_back();
         return val;
@@ -73,7 +74,7 @@ private:
             return holds_alternative<int32_t>(v) || holds_alternative<int64_t>(v) ||
                    holds_alternative<float>(v) || holds_alternative<double>(v); 
         };
-        if (!is_num(a) || !is_num(b)) throw std::runtime_error("Operands must be numbers: " + op_name); // op_name for debugging
+        if (!is_num(a) || !is_num(b)) throw runtime_error("Operands must be numbers: " + op_name); // op_name for debugging
 
         if (holds_alternative<float>(a) || holds_alternative<double>(a) || 
             holds_alternative<float>(b) || holds_alternative<double>(b)) {
@@ -257,7 +258,7 @@ public:
                             goto load_done;
                         }
                     }
-                    throw std::runtime_error("Undefined variable '" + var_name + "'");
+                    throw runtime_error("Undefined variable '" + var_name + "'");
                     load_done:
                     break;
                 }
@@ -319,7 +320,7 @@ public:
                     }
                     
                     else {
-                        throw std::runtime_error("Unsupported cast target");
+                        throw runtime_error("Unsupported cast target");
                     }
                     break;
                 }
@@ -337,7 +338,7 @@ public:
                 }
 
                 case OpCode::OP_DUPLICATE: {
-                    if (stack.empty()) throw std::runtime_error("Stack underflow!");
+                    if (stack.empty()) throw runtime_error("Stack underflow!");
                     push(stack.back());
                     break;
                 }
@@ -355,9 +356,9 @@ public:
                     Value idx_val = pop();
                     int64_t index = holds_alternative<int32_t>(idx_val) ? get<int32_t>(idx_val) : get<int64_t>(idx_val);
                     Value arr_val = pop();
-                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw std::runtime_error("Not an array");
+                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw runtime_error("Not an array");
                     auto arr = get<shared_ptr<ArrayObject>>(arr_val);
-                    if (index < 0 || index >= (int64_t)arr->elements.size()) throw std::runtime_error("Array index out of bounds");
+                    if (index < 0 || index >= (int64_t)arr->elements.size()) throw runtime_error("Array index out of bounds");
                     push(arr->elements[index]);
                     break;
                 }
@@ -366,16 +367,16 @@ public:
                     Value idx_val = pop();
                     int64_t index = holds_alternative<int32_t>(idx_val) ? get<int32_t>(idx_val) : get<int64_t>(idx_val);
                     Value arr_val = pop();
-                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw std::runtime_error("Not an array");
+                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw runtime_error("Not an array");
                     auto arr = get<shared_ptr<ArrayObject>>(arr_val);
-                    if (index < 0 || index >= (int64_t)arr->elements.size()) throw std::runtime_error("Array index out of bounds");
+                    if (index < 0 || index >= (int64_t)arr->elements.size()) throw runtime_error("Array index out of bounds");
                     arr->elements[index] = val;
                     break;
                 }
                 case OpCode::OP_ARRAY_PUSH: {
                     Value val = pop();
                     Value arr_val = pop();
-                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw std::runtime_error("Not an array");
+                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw runtime_error("Not an array");
                     auto arr = get<shared_ptr<ArrayObject>>(arr_val);
                     arr->elements.push_back(val);
                     push(arr_val);
@@ -383,9 +384,9 @@ public:
                 }
                 case OpCode::OP_ARRAY_POP: {
                     Value arr_val = pop();
-                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw std::runtime_error("Not an array");
+                    if (!holds_alternative<shared_ptr<ArrayObject>>(arr_val)) throw runtime_error("Not an array");
                     auto arr = get<shared_ptr<ArrayObject>>(arr_val);
-                    if (arr->elements.empty()) throw std::runtime_error("Cannot pop from empty array");
+                    if (arr->elements.empty()) throw runtime_error("Cannot pop from empty array");
                     Value popped = arr->elements.back();
                     arr->elements.pop_back();
                     push(popped);
@@ -399,7 +400,7 @@ public:
                     string func_name = get<string>(bytecode.constants[name_index]);
                     call_stack.push_back(ip);
                     scopes.push_back({});
-                    if (bytecode.function_addresses.find(func_name) == bytecode.function_addresses.end()) throw std::runtime_error("Undefined function");
+                    if (bytecode.function_addresses.find(func_name) == bytecode.function_addresses.end()) throw runtime_error("Undefined function");
                     ip = bytecode.function_addresses.at(func_name);
                     break;
                 }
@@ -467,7 +468,7 @@ public:
                 
                 // End of code
                 case OpCode::OP_HALT: return;
-                default: throw std::runtime_error("Unknown opcode");
+                default: throw runtime_error("Unknown opcode");
             }
         }
     }

@@ -9,6 +9,7 @@
 
 #include "token.hpp"
 
+using std::runtime_error;
 using std::unordered_map;
 using std::vector;
 using std::string;
@@ -114,20 +115,20 @@ class Lexer {
         while (!is_at_end() && peek() != quote) {
             if (peek() == '\\') {
                 next();
-                if (is_at_end()) throw std::runtime_error("Unterminated escape sequence");
+                if (is_at_end()) throw runtime_error("Unterminated escape sequence");
                 value += decode_escape(next());
             } else {
                 value += next();
             }
         }
-        if (is_at_end()) throw std::runtime_error("Unterminated literal");
+        if (is_at_end()) throw runtime_error("Unterminated literal");
         next();
         return value;
     }
 
     Token scan_char(char quote) {
         std::string v = scan_quoted(quote);
-        if (v.size() != 1) throw std::runtime_error("Char literal must contain exactly one character");
+        if (v.size() != 1) throw runtime_error("Char literal must contain exactly one character");
         Token token = make_token(TokenType::CHAR_LITERAL);
         token.text = std::move(v);
         return token;
@@ -178,7 +179,7 @@ public:
                         next();
                         tokens.push_back(make_token(TokenType::AND));
                     } else {
-                        throw std::runtime_error("Unexpected character '&'");
+                        throw runtime_error("Unexpected character '&'");
                     }
                     break;
                 case '|':
@@ -186,7 +187,7 @@ public:
                         next();
                         tokens.push_back(make_token(TokenType::OR));
                     } else {
-                        throw std::runtime_error("Unexpected character '|'");
+                        throw runtime_error("Unexpected character '|'");
                     }
                     break;
 
@@ -201,7 +202,7 @@ public:
                         next(); 
                         tokens.push_back(make_token(TokenType::COLON_COLON)); 
                     } else { 
-                        throw std::runtime_error("Unexpected character ':'"); 
+                        throw runtime_error("Unexpected character ':'"); 
                     }
                     break;
                 
@@ -305,7 +306,7 @@ public:
                         }
                     } else { 
                         std::cout << "Unknown character: '" << c << "' (ASCII: " << (int)c << ")\n";
-                        throw std::runtime_error("Unexpected character."); 
+                        throw runtime_error("Unexpected character."); 
                     }
                     break;
             }

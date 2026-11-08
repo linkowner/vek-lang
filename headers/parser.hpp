@@ -7,6 +7,7 @@
 #include "token.hpp"
 #include "ast.hpp"
 
+using std::runtime_error;
 using std::vector;
 using std::string;
 using std::unique_ptr;
@@ -33,7 +34,7 @@ private:
     Token previous() const { return tokens[current - 1]; }
     bool match(TokenType type) { if (!check(type)) return false; ++current; return true; }
     Token consume(TokenType expected, const string& message) {
-        if (!check(expected)) throw std::runtime_error(message);
+        if (!check(expected)) throw runtime_error(message);
         return tokens[current++];
     }
 
@@ -71,7 +72,7 @@ private:
 
             auto* var_target = dynamic_cast<VariableExpr*>(expr.get());
             if (!var_target) {
-                throw std::runtime_error("Invalid target for compound assignment");
+                throw runtime_error("Invalid target for compound assignment");
             }
 
             return make_unique<AssignExpr>(var_target->name, math_op, move(value));
@@ -104,7 +105,7 @@ private:
                 path = previous().text;
                 is_stdlib = true;
             } else {
-                throw std::runtime_error("Expected file path or module name after 'load'");
+                throw runtime_error("Expected file path or module name after 'load'");
             }
             
             consume(TokenType::SEMICOLON, "Expected ';' after load");
@@ -154,7 +155,7 @@ private:
         if (match(TokenType::SEMICOLON)) {
             return make_unique<ExprStmt>(move(quick_assign));
         }
-        throw std::runtime_error("Parsing failed on token: " + tokens[current].text + " (Previous: " + previous().text + ")");
+        throw runtime_error("Parsing failed on token: " + tokens[current].text + " (Previous: " + previous().text + ")");
     }
 
     unique_ptr<Stmt> parse_block() {
@@ -269,7 +270,7 @@ private:
         if (match(TokenType::CHAR)) return TokenType::CHAR;
         if (match(TokenType::BOOL)) return TokenType::BOOL;
         if (match(TokenType::VOID)) return TokenType::VOID;
-        throw std::runtime_error("Expected a type");
+        throw runtime_error("Expected a type");
     }
 
     unique_ptr<Stmt> parse_declaration() {
@@ -445,6 +446,6 @@ private:
             consume(TokenType::RPAREN, "Expected ')'");
             return expr;
         }
-        throw std::runtime_error("Expected a value, variable, or '('");
+        throw runtime_error("Expected a value, variable, or '('");
     }
 };
