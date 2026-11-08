@@ -12,6 +12,8 @@ struct SourceLocation {
 
 enum class TokenType {
     // Basic
+    LOAD,
+    
     LET, CONST, FUNC, 
     IF, ELSE, WHILE, FOR,    
     PRINT, RET,
@@ -29,10 +31,10 @@ enum class TokenType {
     PLUS_EQUALS, MINUS_EQUALS, STAR_EQUALS, SLASH_EQUALS,
     
     // Logic
-    NOT, NOT_EQUALS, 
+    AND, OR, NOT, 
     GREATER_THAN, LESS_THAN, 
     GREATER_EQUAL, LESS_EQUAL, 
-    EQUALS_EQUALS, 
+    EQUALS_EQUALS, NOT_EQUALS, 
 
     // Parens & Braces
     LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET, DOT,

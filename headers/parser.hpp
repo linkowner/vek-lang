@@ -46,12 +46,12 @@ private:
             TokenType type = parse_type();
             Token name = consume(TokenType::IDENTIFIER, "Expected name");
             consume(TokenType::EQUALS, "Expected '='");
-            auto init_expr = parse_expression();
+            auto init_expr = parse_logic();
             
             return make_unique<VarDecl>(type, name.text, false, is_const, nullptr, move(init_expr));
         }
         
-        return make_unique<ExprStmt>(parse_expression());
+        return make_unique<ExprStmt>(parse_logic());
     }
     
     // x += N: x = x + N (WITHOUT SEMICOLON)
@@ -67,7 +67,7 @@ private:
             else if (op == TokenType::STAR_EQUALS) math_op = TokenType::STAR;
             else math_op = TokenType::SLASH;
 
-            auto value = parse_expression();
+            auto value = parse_logic();
 
             auto* var_target = dynamic_cast<VariableExpr*>(expr.get());
             if (!var_target) {
@@ -79,8 +79,38 @@ private:
         return expr;
     }
 
+    unique_ptr<Expr> parse_logic() {
+        auto expr = parse_expression();
+        while (match(TokenType::AND) || match(TokenType::OR)) {
+            TokenType op = previous().type;
+            auto right = parse_expression();
+            expr = make_unique<BinaryExpr>(move(expr), op, move(right));
+        }
+        return expr;
+    }
+
     // Parsing
     unique_ptr<Stmt> parse_statement() {
+        if (match(TokenType::LOAD)) {
+            string path;
+            bool is_stdlib = false;
+
+            if (match(TokenType::STR_LITERAL)) {
+                // User files
+                path = previous().text;
+                is_stdlib = false;
+            } else if (match(TokenType::IDENTIFIER)) {
+                // Standard lib files
+                path = previous().text;
+                is_stdlib = true;
+            } else {
+                throw std::runtime_error("Expected file path or module name after 'load'");
+            }
+            
+            consume(TokenType::SEMICOLON, "Expected ';' after load");
+            return make_unique<LoadStmt>(path, is_stdlib);
+        }
+
         if (check(TokenType::LET) || check(TokenType::CONST)) {
             return parse_declaration();
         }
@@ -92,7 +122,7 @@ private:
 
         if (match(TokenType::PRINT)) {
             consume(TokenType::LPAREN, "Expected '(' after 'print'");
-            auto expr = parse_expression();
+            auto expr = parse_logic();
             consume(TokenType::RPAREN, "Expected ')' after print expression");
             consume(TokenType::SEMICOLON, "Expected ';'");
             return make_unique<PrintStmt>(move(expr));
@@ -101,14 +131,14 @@ private:
         if (check(TokenType::RET)) {
             consume(TokenType::RET, "Expected 'ret'");
             unique_ptr<Expr> value = nullptr;
-            if (!check(TokenType::SEMICOLON)) value = parse_expression();
+            if (!check(TokenType::SEMICOLON)) value = parse_logic();
             consume(TokenType::SEMICOLON, "Expected ';'");
             return make_unique<ReturnStmt>(move(value));
         }
 
         if (check(TokenType::LBRACE)) return parse_block();
 
-        auto expr = parse_expression();
+        auto expr = parse_logic();
         auto quick_assign = parse_quick_assignment(move(expr));
 
         if (dynamic_cast<AssignExpr*>(quick_assign.get())) {
@@ -117,14 +147,14 @@ private:
         }
         
         if (match(TokenType::EQUALS)) {
-            auto value = parse_expression();
+            auto value = parse_logic();
             consume(TokenType::SEMICOLON, "Expected ';'");
             return make_unique<AssignStmt>(move(quick_assign), move(value));
         }
         if (match(TokenType::SEMICOLON)) {
             return make_unique<ExprStmt>(move(quick_assign));
         }
-        throw std::runtime_error("Parsing failed");
+        throw std::runtime_error("Parsing failed on token: " + tokens[current].text + " (Previous: " + previous().text + ")");
     }
 
     unique_ptr<Stmt> parse_block() {
@@ -140,7 +170,7 @@ private:
     unique_ptr<Stmt> parse_if() {
         consume(TokenType::IF, "Expected 'if'");
         consume(TokenType::LPAREN, "Expected '('");
-        auto condition = parse_expression();
+        auto condition = parse_logic();
         consume(TokenType::RPAREN, "Expected ')'");
         
         auto then_branch = parse_block();
@@ -160,7 +190,7 @@ private:
     unique_ptr<Stmt> parse_while() {
         consume(TokenType::WHILE, "Expected 'while'");
         consume(TokenType::LPAREN, "Expected '('");
-        auto condition = parse_expression();
+        auto condition = parse_logic();
         consume(TokenType::RPAREN, "Expected ')'");
         
         // Body
@@ -178,7 +208,7 @@ private:
             if (check(TokenType::LET) || check(TokenType::CONST)) {
                 initializer = parse_for_initializer(); 
             } else {
-                auto expr = parse_expression();
+                auto expr = parse_logic();
                 initializer = make_unique<ExprStmt>(move(expr));
             }
         } 
@@ -187,14 +217,14 @@ private:
         // Condition
         unique_ptr<Expr> condition = nullptr;
         if (!check(TokenType::SEMICOLON)) {
-            condition = parse_expression();
+            condition = parse_logic();
         }
         consume(TokenType::SEMICOLON, "Expected ';' after loop condition");
 
         // Increment
         unique_ptr<Expr> increment = nullptr;
         if (!check(TokenType::RPAREN)) {
-            auto expr = parse_expression();
+            auto expr = parse_logic();
             increment = parse_quick_assignment(move(expr));
         }
         consume(TokenType::RPAREN, "Expected ')' after 'for'");
@@ -260,14 +290,14 @@ private:
         if (match(TokenType::LBRACKET)) {
             is_array = true;
             if (!check(TokenType::RBRACKET)) {
-                array_size = parse_expression();
+                array_size = parse_logic();
             }
             consume(TokenType::RBRACKET, "Expected ']'");
         }
 
         unique_ptr<Expr> initializer = nullptr;
         if (match(TokenType::EQUALS)) {
-            initializer = parse_expression();
+            initializer = parse_logic();
         }
         
         consume(TokenType::SEMICOLON, "Expected ';'");
@@ -307,7 +337,7 @@ private:
 
         while (true) {
             if (match(TokenType::LBRACKET)) {
-                auto index = parse_expression();
+                auto index = parse_logic();
                 consume(TokenType::RBRACKET, "Expected ']'");
                 expr = make_unique<ArrayAccessExpr>(move(expr), move(index));
             } 
@@ -317,7 +347,7 @@ private:
                 vector<unique_ptr<Expr>> args;
                 if (!check(TokenType::RPAREN)) {
                     do {
-                        args.push_back(parse_expression());
+                        args.push_back(parse_logic());
                     } while (match(TokenType::COMMA));
                 }
                 consume(TokenType::RPAREN, "Expected ')'");
@@ -368,15 +398,6 @@ private:
             }
             return make_unique<Float32Literal>(std::stof(text));
         }
-        
-        if (match(TokenType::MINUS)) {
-            auto expr = parse_primary();
-            return make_unique<BinaryExpr>(
-                make_unique<Int64Literal>(0),
-                TokenType::MINUS,
-                move(expr)
-            );
-        }
 
         if (match(TokenType::BOOL_LITERAL)) return make_unique<BoolLiteral>(previous().text == "true");
         if (match(TokenType::STR_LITERAL)) return make_unique<StringLiteral>(previous().text);
@@ -386,7 +407,7 @@ private:
             vector<unique_ptr<Expr>> elements;
             if (!check(TokenType::RBRACE)) {
                 do {
-                    elements.push_back(parse_expression());
+                    elements.push_back(parse_logic());
                 } while (match(TokenType::COMMA));
             }
             consume(TokenType::RBRACE, "Expected '}'");
@@ -398,7 +419,7 @@ private:
             if (match(TokenType::LPAREN)) {
                 vector<unique_ptr<Expr>> args;
                 if (!check(TokenType::RPAREN)) {
-                    do { args.push_back(parse_expression()); } while (match(TokenType::COMMA));
+                    do { args.push_back(parse_logic()); } while (match(TokenType::COMMA));
                 }
                 consume(TokenType::RPAREN, "Expected ')'");
                 return make_unique<CallExpr>(name, move(args));
@@ -407,7 +428,20 @@ private:
         }
 
         if (match(TokenType::LPAREN)) {
-            auto expr = parse_expression();
+            // cast check
+            if (check(TokenType::INT32) || check(TokenType::INT64) || 
+                check(TokenType::FLOAT32) || check(TokenType::FLOAT64) || 
+                check(TokenType::STR) || check(TokenType::CHAR) || 
+                check(TokenType::BOOL)) {
+                
+                TokenType target_type = parse_type();
+                consume(TokenType::RPAREN, "Expected ')' after cast type");
+                auto expr = parse_primary();
+                return make_unique<CastExpr>(target_type, move(expr));
+            }
+            
+            // Fallback to grouping
+            auto expr = parse_logic();
             consume(TokenType::RPAREN, "Expected ')'");
             return expr;
         }

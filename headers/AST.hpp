@@ -34,6 +34,12 @@ struct AssignExpr : Expr {
         : name(move(n)), op(o), value(move(v)) {}
 };
 
+struct CastExpr : Expr {
+    TokenType target_type;
+    unique_ptr<Expr> expr;
+    CastExpr(TokenType t, unique_ptr<Expr> e) : target_type(t), expr(move(e)) {}
+};
+
 struct UnaryExpr : Expr {
     TokenType op;
     unique_ptr<Expr> right;
@@ -74,6 +80,12 @@ struct BinaryExpr : Expr {
 };
 
 struct Stmt { virtual ~Stmt() = default; };
+
+struct LoadStmt : Stmt {
+    string filepath;
+    bool is_stdlib;
+    LoadStmt(string path, bool stdlib) : filepath(move(path)), is_stdlib(stdlib) {}
+};
 
 struct ExprStmt : Stmt {
     unique_ptr<Expr> expression;

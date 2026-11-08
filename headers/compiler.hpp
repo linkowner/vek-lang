@@ -30,6 +30,8 @@ private:
     vector<unordered_map<string, Type>> variable_scopes;
     vector<unordered_map<string, bool>> constant_scopes;
 
+    vector<string> loaded_files;
+
     // Scope helpers
     void push_scope() { 
         variable_scopes.push_back({}); 
@@ -95,6 +97,53 @@ private:
     void patch_jump(Bytecode& bytecode, size_t jump_index, size_t target) {
         bytecode.code[jump_index] = (target >> 8) & 0xFF;
         bytecode.code[jump_index + 1] = target & 0xFF;
+    }
+
+    // Load compile
+    void compile_load(LoadStmt* stmt, Bytecode& bytecode) {
+        string full_path = stmt->filepath;
+
+        // Add ".vek" extension
+        if (stmt->is_stdlib) {
+            full_path = "libs/" + full_path + ".vek";
+        } else {
+            full_path = full_path + ".vek";
+        }
+
+        // Already loaded current file?
+        for (const auto& file : loaded_files) {
+            if (file == full_path) return; 
+        }
+        loaded_files.push_back(full_path);
+
+        // Read the file
+        std::ifstream file(full_path);
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not find module: " + stmt->filepath);
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        Lexer lexer(buffer.str());
+        auto tokens = lexer.lex();
+        Parser parser(tokens);
+        auto program = parser.parse_program();
+
+        // Register funcs
+        for (const auto& loaded_stmt : program) {
+            if (auto* func = dynamic_cast<FuncDecl*>(loaded_stmt.get())) {
+                if (func->name == "main") {
+                    throw std::runtime_error("Modules cannot define 'main'.");
+                }
+                functions[func->name] = func;
+                function_return_types[func->name] = token_to_type(func->return_type);
+            }
+        }
+
+        // Compile the funcs
+        for (const auto& loaded_stmt : program) {
+            compile_stmt(loaded_stmt.get(), bytecode);
+        }
     }
 
     // Control Flow
@@ -269,6 +318,7 @@ private:
             return;
         }
 
+        if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt)) { compile_load(load_stmt, bytecode); return; }
         if (auto* if_stmt = dynamic_cast<IfStmt*>(stmt)) { compile_if(if_stmt, bytecode); return; }
         if (auto* while_stmt = dynamic_cast<WhileStmt*>(stmt)) { compile_while(while_stmt, bytecode); return; }
         if (auto* for_stmt = dynamic_cast<ForStmt*>(stmt)) { compile_for(for_stmt, bytecode); return; }
@@ -277,6 +327,24 @@ private:
         if (auto* assign_stmt = dynamic_cast<AssignStmt*>(stmt)) { compile_assign(assign_stmt, bytecode); return; }
         if (auto* print_stmt = dynamic_cast<PrintStmt*>(stmt)) { compile_print(print_stmt, bytecode); return; }
         if (auto* ret_stmt = dynamic_cast<ReturnStmt*>(stmt)) { compile_return(ret_stmt, bytecode); return; }
+
+
+        if (auto* func = dynamic_cast<FuncDecl*>(stmt)) {
+            bytecode.function_addresses[func->name] = bytecode.code.size();
+            
+            push_scope();
+            for (const auto& param : func->params) {
+                int name_idx = bytecode.add_const(param.name);
+                bytecode.emit(OpCode::OP_DEFINE_VAR, name_idx);
+                set_var_type(param.name, token_to_type(param.type));
+            }
+            
+            for (const auto& body_stmt : func->body) {
+                compile_stmt(body_stmt.get(), bytecode);
+            }
+            pop_scope();
+            return;
+        }
 
         if (auto* expr_stmt = dynamic_cast<ExprStmt*>(stmt)) {
             compile_expr(expr_stmt->expression.get(), bytecode, Type::UNKNOWN);
@@ -379,7 +447,9 @@ private:
         }
 
         if (auto* call = dynamic_cast<CallExpr*>(expr)) {
-            for (const auto& arg : call->arguments) compile_expr(arg.get(), bytecode, Type::UNKNOWN);
+            for (auto it = call->arguments.rbegin(); it != call->arguments.rend(); ++it) {
+                compile_expr(it->get(), bytecode, Type::UNKNOWN);
+            }
             int name_idx = bytecode.add_const(call->name);
             bytecode.emit(OpCode::OP_CALL, name_idx, call->arguments.size());
             return function_return_types.count(call->name) ? function_return_types[call->name] : Type::UNKNOWN;
@@ -393,7 +463,41 @@ private:
             return Type::BOOL;
         }
 
+        if (auto* cast = dynamic_cast<CastExpr*>(expr)) {
+            compile_expr(cast->expr.get(), bytecode, Type::UNKNOWN);
+            
+            bytecode.emit(OpCode::OP_CAST, static_cast<uint8_t>(cast->target_type));
+            return token_to_type(cast->target_type);
+        }
+
         if (auto* bin = dynamic_cast<BinaryExpr*>(expr)) {
+            
+            // Short circuit
+            if (bin->op == TokenType::AND) {
+                compile_expr(bin->left.get(), bytecode, Type::UNKNOWN);
+                bytecode.emit(OpCode::OP_DUPLICATE);
+                bytecode.emit(OpCode::OP_JUMP_IF_FALSE, 0, 0);
+                size_t jump_if_false = bytecode.code.size() - 2;
+                
+                bytecode.emit(OpCode::OP_POP);
+                compile_expr(bin->right.get(), bytecode, Type::UNKNOWN);
+                
+                patch_jump(bytecode, jump_if_false, bytecode.code.size());
+                return Type::BOOL;
+            }
+            if (bin->op == TokenType::OR) {
+                compile_expr(bin->left.get(), bytecode, Type::UNKNOWN);
+                bytecode.emit(OpCode::OP_DUPLICATE);
+                bytecode.emit(OpCode::OP_JUMP_IF_TRUE, 0, 0);
+                size_t jump_if_true = bytecode.code.size() - 2;
+                
+                bytecode.emit(OpCode::OP_POP);
+                compile_expr(bin->right.get(), bytecode, Type::UNKNOWN);
+                
+                patch_jump(bytecode, jump_if_true, bytecode.code.size());
+                return Type::BOOL;
+            }
+            
             Type left_type = compile_expr(bin->left.get(), bytecode, expected_type);
             Type right_type = compile_expr(bin->right.get(), bytecode, expected_type);
             
@@ -440,7 +544,16 @@ private:
                 if (!is_numeric(left_type) || !is_numeric(right_type)) {
                     throw std::runtime_error("Math operations require numbers, got " + type_to_string(left_type) + " and " + type_to_string(right_type));
                 }
-                result_type = Type::BOOL; 
+                
+                if (left_type == Type::FLOAT64 || right_type == Type::FLOAT64) {
+                    result_type = Type::FLOAT64;
+                } else if (left_type == Type::FLOAT32 || right_type == Type::FLOAT32) {
+                    result_type = Type::FLOAT32;
+                } else if (left_type == Type::INT64 || right_type == Type::INT64) {
+                    result_type = Type::INT64;
+                } else {
+                    result_type = Type::INT32;
+                }
             }
 
             switch (bin->op) {
@@ -468,9 +581,9 @@ private:
 public:
     Bytecode compile(const vector<unique_ptr<Stmt>>& program) {
         Bytecode bytecode;
-        
-        push_scope(); // Global scope
+        push_scope();
 
+        // Register functions in the main file
         for (const auto& stmt : program) {
             if (auto* func = dynamic_cast<FuncDecl*>(stmt.get())) {
                 functions[func->name] = func;
@@ -478,35 +591,39 @@ public:
             }
         }
 
+        // Emit the jump
         bytecode.emit(OpCode::OP_JUMP, 0, 0);
         size_t jump_placeholder = bytecode.code.size() - 2;
 
+        // Compile non-main functions
         for (const auto& stmt : program) {
             if (auto* func = dynamic_cast<FuncDecl*>(stmt.get())) {
                 if (func->name == "main") continue;
-                
-                bytecode.function_addresses[func->name] = bytecode.code.size();
-                push_scope(); // Function scope
-
-                for (const auto& param : func->params) {
-                    int name_idx = bytecode.add_const(param.name);
-                    bytecode.emit(OpCode::OP_DEFINE_VAR, name_idx);
-                    set_var_type(param.name, token_to_type(param.type));
-                }
-                
-                for (const auto& body_stmt : func->body) compile_stmt(body_stmt.get(), bytecode);
-                
-                pop_scope(); // End function scope
+                compile_stmt(stmt.get(), bytecode);
             }
         }
 
-        if (functions.find("main") == functions.end()) throw std::runtime_error("No 'main' function found.");
+        // Process loads
+        for (const auto& stmt : program) {
+            if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt.get())) {
+                compile_load(load_stmt, bytecode);
+            }
+        }
+
+        // Patch jump to main
+        if (functions.find("main") == functions.end()) {
+            throw std::runtime_error("No 'main' function found.");
+        }
         uint16_t main_addr = (uint16_t)bytecode.code.size();
         bytecode.function_addresses["main"] = main_addr;
         bytecode.code[jump_placeholder] = (main_addr >> 8) & 0xFF;
         bytecode.code[jump_placeholder + 1] = main_addr & 0xFF;
 
-        for (const auto& stmt : functions["main"]->body) compile_stmt(stmt.get(), bytecode);
+        // Compile main
+        for (const auto& stmt : functions["main"]->body) {
+            compile_stmt(stmt.get(), bytecode);
+        }
+
         bytecode.emit(OpCode::OP_HALT);
         return bytecode;
     }

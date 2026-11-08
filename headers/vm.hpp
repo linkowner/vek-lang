@@ -261,6 +261,68 @@ public:
                     load_done:
                     break;
                 }
+                case OpCode::OP_CAST: {
+                    uint8_t target_type_id = bytecode.code[ip++];
+                    TokenType target_type = static_cast<TokenType>(target_type_id);
+                    Value val = pop();
+                    
+                    // To string
+                    if (target_type == TokenType::STR) {
+                        push(value_to_string(val));
+                        break;
+                    }
+
+                    // To int
+                    if (target_type == TokenType::INT32 || target_type == TokenType::INT64) {
+                        long long result = 0;
+                        if (holds_alternative<int32_t>(val)) result = get<int32_t>(val);
+                        else if (holds_alternative<int64_t>(val)) result = get<int64_t>(val);
+                        else if (holds_alternative<float>(val)) result = static_cast<long long>(get<float>(val));
+                        else if (holds_alternative<double>(val)) result = static_cast<long long>(get<double>(val));
+                        else if (holds_alternative<bool>(val)) result = get<bool>(val) ? 1 : 0;
+                        else if (holds_alternative<char>(val)) result = static_cast<long long>(get<char>(val));
+                        
+                        push(result);
+                    }
+                    // To float
+                    else if (target_type == TokenType::FLOAT32 || target_type == TokenType::FLOAT64) {
+                        double result = 0.0;
+                        if (holds_alternative<int32_t>(val)) result = static_cast<double>(get<int32_t>(val));
+                        else if (holds_alternative<int64_t>(val)) result = static_cast<double>(get<int64_t>(val));
+                        else if (holds_alternative<float>(val)) result = static_cast<double>(get<float>(val));
+                        else if (holds_alternative<double>(val)) result = get<double>(val);
+                        else if (holds_alternative<bool>(val)) result = get<bool>(val) ? 1.0 : 0.0;
+                        else if (holds_alternative<char>(val)) result = static_cast<double>(get<char>(val));
+                        
+                        push(result);
+                    }
+                    // To bool
+                    else if (target_type == TokenType::BOOL) {
+                        bool result = false;
+                        if (holds_alternative<int32_t>(val)) result = (get<int32_t>(val) != 0);
+                        else if (holds_alternative<int64_t>(val)) result = (get<int64_t>(val) != 0);
+                        else if (holds_alternative<float>(val)) result = (get<float>(val) != 0.0f);
+                        else if (holds_alternative<double>(val)) result = (get<double>(val) != 0.0);
+                        else if (holds_alternative<bool>(val)) result = get<bool>(val);
+                        else if (holds_alternative<char>(val)) result = (get<char>(val) != '\0');
+                        
+                        push(result);
+                    }
+                    // To char
+                    else if (target_type == TokenType::CHAR) {
+                        char result = '\0';
+                        if (holds_alternative<int32_t>(val)) result = static_cast<char>(get<int32_t>(val));
+                        else if (holds_alternative<int64_t>(val)) result = static_cast<char>(get<int64_t>(val));
+                        else if (holds_alternative<char>(val)) result = get<char>(val);
+                        
+                        push(result);
+                    }
+                    
+                    else {
+                        throw std::runtime_error("Unsupported cast target");
+                    }
+                    break;
+                }
                 case OpCode::OP_POP: {
                     pop();
                     break;
@@ -271,6 +333,12 @@ public:
                 }
                 case OpCode::OP_EXIT_SCOPE: {
                     scopes.pop_back();
+                    break;
+                }
+
+                case OpCode::OP_DUPLICATE: {
+                    if (stack.empty()) throw std::runtime_error("Stack underflow!");
+                    push(stack.back());
                     break;
                 }
 
@@ -357,14 +425,34 @@ public:
                     uint16_t target = (high << 8) | low;
                     
                     Value condition = pop();
-                    bool is_false = false;
-                    if (holds_alternative<bool>(condition) && !get<bool>(condition)) is_false = true;
-                    else if (holds_alternative<int64_t>(condition) && get<int64_t>(condition) == 0) is_false = true;
-                    else if (holds_alternative<double>(condition) && get<double>(condition) == 0.0) is_false = true;
-                    else if (holds_alternative<int32_t>(condition) && get<int32_t>(condition) == 0) is_false = true;
-                    else if (holds_alternative<std::monostate>(condition)) is_false = true;
-
-                    if (is_false) {
+                    bool is_truthy = false;
+                    
+                    if (holds_alternative<bool>(condition)) is_truthy = get<bool>(condition);
+                    else if (holds_alternative<int64_t>(condition)) is_truthy = (get<int64_t>(condition) != 0);
+                    else if (holds_alternative<int32_t>(condition)) is_truthy = (get<int32_t>(condition) != 0);
+                    else if (holds_alternative<double>(condition)) is_truthy = (get<double>(condition) != 0.0);
+                    else if (holds_alternative<char>(condition)) is_truthy = (get<char>(condition) != '\0');
+                    
+                    if (!is_truthy) {
+                        ip = target;
+                    }
+                    break;
+                }
+                case OpCode::OP_JUMP_IF_TRUE: {
+                    uint8_t high = bytecode.code[ip++];
+                    uint8_t low = bytecode.code[ip++];
+                    uint16_t target = (high << 8) | low;
+                    
+                    Value condition = pop();
+                    bool is_truthy = false;
+                    
+                    if (holds_alternative<bool>(condition)) is_truthy = get<bool>(condition);
+                    else if (holds_alternative<int64_t>(condition)) is_truthy = (get<int64_t>(condition) != 0);
+                    else if (holds_alternative<int32_t>(condition)) is_truthy = (get<int32_t>(condition) != 0);
+                    else if (holds_alternative<double>(condition)) is_truthy = (get<double>(condition) != 0.0);
+                    else if (holds_alternative<char>(condition)) is_truthy = (get<char>(condition) != '\0');
+                    
+                    if (is_truthy) {
                         ip = target;
                     }
                     break;

@@ -14,6 +14,8 @@ using std::vector;
 using std::string;
 
 inline const unordered_map<std::string, TokenType> keywords = {
+    {"load", TokenType::LOAD},
+
     {"let", TokenType::LET},
     {"const", TokenType::CONST},
 
@@ -47,7 +49,7 @@ inline const unordered_map<std::string, TokenType> keywords = {
 };
 
 class Lexer {
-    const string& source;
+    const string source;
     vector<Token> tokens;
 
     size_t start = 0;
@@ -57,8 +59,14 @@ class Lexer {
     bool is_at_end() const { return current >= source.size(); }
 
     void skip_whitespace() {
-        while(!is_at_end() && std::isspace(static_cast<unsigned char>(peek()))) {
-            ++current;
+        while(!is_at_end()) {
+            unsigned char c = static_cast<unsigned char>(peek());
+            
+            if (std::isspace(c) || c < 32 || c > 126) {
+                ++current;
+            } else {
+                break;
+            }
         }
     }
 
@@ -165,6 +173,23 @@ public:
                     }
                     break;
 
+                case '&':
+                    if (peek() == '&') {
+                        next();
+                        tokens.push_back(make_token(TokenType::AND));
+                    } else {
+                        throw std::runtime_error("Unexpected character '&'");
+                    }
+                    break;
+                case '|':
+                    if (peek() == '|') {
+                        next();
+                        tokens.push_back(make_token(TokenType::OR));
+                    } else {
+                        throw std::runtime_error("Unexpected character '|'");
+                    }
+                    break;
+
                 case ';': tokens.push_back(make_token(TokenType::SEMICOLON)); break;
                 case '{': tokens.push_back(make_token(TokenType::LBRACE)); break;
                 case '}': tokens.push_back(make_token(TokenType::RBRACE)); break;
@@ -221,6 +246,10 @@ public:
                     }
                     break;
 
+                case '#':
+                    while(peek() != '\n' && !is_at_end()) next();
+                    break;
+
                 case '(': tokens.push_back(make_token(TokenType::LPAREN)); break;
                 case ')': tokens.push_back(make_token(TokenType::RPAREN)); break;
                 case '!':
@@ -274,7 +303,10 @@ public:
                         } else {
                             tokens.push_back(make_token(TokenType::INT64_LITERAL));
                         }
-                    } else { throw std::runtime_error("Unexpected character."); }
+                    } else { 
+                        std::cout << "Unknown character: '" << c << "' (ASCII: " << (int)c << ")\n";
+                        throw std::runtime_error("Unexpected character."); 
+                    }
                     break;
             }
         }

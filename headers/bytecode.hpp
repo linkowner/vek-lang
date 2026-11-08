@@ -44,12 +44,15 @@ enum class OpCode {
     OP_POP = 0x13,
     OP_ENTER_SCOPE = 0x14,
     OP_EXIT_SCOPE = 0x15,
+    OP_CAST = 0x16,
+    OP_DUPLICATE = 0x17,
 
     // Control Flow
     OP_RETURN = 0x20,
     OP_CALL = 0x21,
     OP_JUMP = 0x22,
     OP_JUMP_IF_FALSE = 0x23,
+    OP_JUMP_IF_TRUE = 0x24,
 
     // System Functions
     OP_PRINT = 0x30,
