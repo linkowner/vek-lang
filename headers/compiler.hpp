@@ -12,6 +12,7 @@
 #include "AST.hpp"
 #include "bytecode.hpp"
 #include "token.hpp"
+#include "paths.hpp"
 
 using std::runtime_error;
 using std::vector;
@@ -20,10 +21,15 @@ using std::string;
 using std::unordered_map;
 using std::unordered_set;
 
+namespace fs = std::filesystem;
+
 enum class Type { INT32, INT64, FLOAT32, FLOAT64, BOOL, CHAR, STR, VOID, ARRAY, UNKNOWN };
 
 class Compiler {
 private:
+    // Directory of the main source file; relative loads resolve from here.
+    string main_dir;
+
     unordered_map<string, FuncDecl*> functions;
     unordered_map<string, Type> function_return_types;
 
@@ -103,13 +109,29 @@ private:
     }
 
     // Module loading
-    string resolve_load_path(LoadStmt* stmt) {
-        if (stmt->is_stdlib) return "libs/" + stmt->filepath + ".vek";
-        return stmt->filepath + ".vek";
+    // User modules resolve relative to the file containing the load statement
+    // (absolute paths are used as-is). Stdlib modules are searched next to the
+    // source file first, then next to the executable, then relative to the CWD.
+    string resolve_load_path(LoadStmt* stmt, const string& base_dir) {
+        if (stmt->is_stdlib) {
+            string file = stmt->filepath + ".vek";
+
+            fs::path next_to_source = fs::path(base_dir) / "libs" / file;
+            if (fs::exists(next_to_source)) return next_to_source.string();
+
+            fs::path next_to_exe = fs::path(paths::exe_dir()) / "libs" / file;
+            if (fs::exists(next_to_exe)) return next_to_exe.string();
+
+            return (fs::path("libs") / file).string();
+        }
+
+        fs::path user_path(stmt->filepath + ".vek");
+        if (user_path.is_absolute()) return user_path.string();
+        return (fs::path(base_dir) / user_path).string();
     }
 
-    void parse_and_register_module(LoadStmt* stmt) {
-        string full_path = resolve_load_path(stmt);
+    void parse_and_register_module(LoadStmt* stmt, const string& base_dir) {
+        string full_path = resolve_load_path(stmt, base_dir);
         if (registered_modules.count(full_path)) return;
         registered_modules.insert(full_path);
 
@@ -120,6 +142,9 @@ private:
         std::stringstream buffer;
         buffer << file.rdbuf();
 
+        // Nested loads resolve relative to this module's own directory.
+        string module_dir = paths::dir_of(full_path);
+
         Lexer lexer(buffer.str());
         auto tokens = lexer.lex();
         Parser parser(tokens);
@@ -127,7 +152,7 @@ private:
 
         for (const auto& s : program) {
             if (auto* load = dynamic_cast<LoadStmt*>(s.get())) {
-                parse_and_register_module(load);
+                parse_and_register_module(load, module_dir);
             }
         }
 
@@ -144,18 +169,20 @@ private:
         parsed_modules[full_path] = std::move(program);
     }
 
-    void emit_module_globals(LoadStmt* stmt, Bytecode& bytecode) {
-        string full_path = resolve_load_path(stmt);
-        parse_and_register_module(stmt);
+    void emit_module_globals(LoadStmt* stmt, Bytecode& bytecode, const string& base_dir) {
+        string full_path = resolve_load_path(stmt, base_dir);
+        parse_and_register_module(stmt, base_dir);
 
         if (emitted_modules.count(full_path)) return;
         emitted_modules.insert(full_path);
+
+        string module_dir = paths::dir_of(full_path);
 
         const auto& program = parsed_modules[full_path];
 
         for (const auto& s : program) {
             if (auto* load = dynamic_cast<LoadStmt*>(s.get())) {
-                emit_module_globals(load, bytecode);
+                emit_module_globals(load, bytecode, module_dir);
             }
         }
 
@@ -353,7 +380,7 @@ private:
             return;
         }
 
-        if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt)) { emit_module_globals(load_stmt, bytecode); return; }
+        if (auto* load_stmt = dynamic_cast<LoadStmt*>(stmt)) { emit_module_globals(load_stmt, bytecode, main_dir); return; }
         if (auto* if_stmt = dynamic_cast<IfStmt*>(stmt)) { compile_if(if_stmt, bytecode); return; }
         if (auto* while_stmt = dynamic_cast<WhileStmt*>(stmt)) { compile_while(while_stmt, bytecode); return; }
         if (auto* for_stmt = dynamic_cast<ForStmt*>(stmt)) { compile_for(for_stmt, bytecode); return; }
@@ -597,6 +624,12 @@ private:
     }
 
 public:
+    // source_path: path of the main file being compiled; relative module
+    // loads resolve from its directory. Empty means the CWD.
+    Compiler(const string& source_path = "") {
+        main_dir = paths::dir_of(source_path);
+    }
+
     Bytecode compile(const vector<unique_ptr<Stmt>>& program) {
         Bytecode bytecode;
         push_scope();
@@ -608,7 +641,7 @@ public:
                 function_return_types[func->name] = token_to_type(func->return_type);
             }
             if (auto* load = dynamic_cast<LoadStmt*>(stmt.get())) {
-                parse_and_register_module(load);
+                parse_and_register_module(load, main_dir);
             }
         }
 

@@ -1,0 +1,2 @@
+// Helper for tests/modpath.vek — a user module resolved next to its importer.
+func helper_double(int n) int { ret n * 2; }

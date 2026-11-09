@@ -11,6 +11,7 @@
 #include "./headers/lexer.hpp"
 #include "./headers/parser.hpp"
 #include "./headers/compiler.hpp"
+#include "./headers/paths.hpp"
 #include "./headers/vm.hpp"
 #include "./headers/serializer.hpp"
 
@@ -62,17 +63,17 @@ int main(int argc, char *argv[]) {
         auto tokens = lexer.lex();
         Parser parser(tokens);
         auto ast = parser.parse_program();
-        Compiler compiler;
+        Compiler compiler(path);
         Bytecode bytecode = compiler.compile(ast);
 
         // Handle the command
         if (command == "build") {
-            // Save to a .vekbc
+            // Save to a .vekbc next to the source file
             fs::path p(path);
-            std::string out_path = p.stem().string() + ".vkc";
+            fs::path out_path = p.parent_path() / (p.stem().string() + ".vkc");
 
-            Serializer::save(bytecode, out_path);
-            std::cout << "Successfully compiled to " << out_path << "\n";
+            Serializer::save(bytecode, out_path.string());
+            std::cout << "Successfully compiled to " << out_path.string() << "\n";
             
         } else if (command == "run") {
             // Execute

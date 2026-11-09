@@ -1,0 +1,11 @@
+// Path-resolution regression test: loads must work regardless of the CWD.
+//   ./vek run tests/modpath.vek                        (from project root)
+//   ./vek run /full/path/to/tests/modpath.vek          (from anywhere)
+load math;
+load "modpath_helper";
+
+func main() int {
+    print(sqrt(25));
+    print(helper_double(10));
+    ret 0;
+}
