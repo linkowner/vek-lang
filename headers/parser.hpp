@@ -33,8 +33,26 @@ private:
     bool check(TokenType type) const { return !is_at_end() && tokens[current].type == type; }
     Token previous() const { return tokens[current - 1]; }
     bool match(TokenType type) { if (!check(type)) return false; ++current; return true; }
+
+    // "[Line L, Col C] " prefix for error messages, based on the current token
+    string where() const {
+        size_t loc_line;
+        size_t loc_column;
+        if (!is_at_end()) {
+            loc_line = tokens[current].location.line;
+            loc_column = tokens[current].location.column;
+        } else if (current > 0) {
+            // Past the last token: report where the input ends
+            loc_line = tokens[current - 1].location.line;
+            loc_column = tokens[current - 1].location.column;
+        } else {
+            return "";
+        }
+        return "[Line " + std::to_string(loc_line) + ", Col " + std::to_string(loc_column) + "] ";
+    }
+
     Token consume(TokenType expected, const string& message) {
-        if (!check(expected)) throw runtime_error(message);
+        if (!check(expected)) throw runtime_error(where() + message);
         return tokens[current++];
     }
 
@@ -72,7 +90,7 @@ private:
 
             auto* var_target = dynamic_cast<VariableExpr*>(expr.get());
             if (!var_target) {
-                throw runtime_error("Invalid target for compound assignment");
+                throw runtime_error(where() + "Invalid target for compound assignment");
             }
 
             return make_unique<AssignExpr>(var_target->name, math_op, move(value));
@@ -105,7 +123,7 @@ private:
                 path = previous().text;
                 is_stdlib = true;
             } else {
-                throw runtime_error("Expected file path or module name after 'load'");
+                throw runtime_error(where() + "Expected file path or module name after 'load'");
             }
             
             consume(TokenType::SEMICOLON, "Expected ';' after load");
@@ -156,7 +174,12 @@ private:
         if (match(TokenType::SEMICOLON)) {
             return make_unique<ExprStmt>(move(quick_assign));
         }
-        throw runtime_error("Parsing failed on token: " + tokens[current].text + " (Previous: " + previous().text + ")");
+        if (is_at_end()) {
+            throw runtime_error(where() + "Parsing failed: unexpected end of file (Previous: '" +
+                                (current > 0 ? tokens[current - 1].text : "") + "')");
+        }
+        throw runtime_error(where() + "Parsing failed on token: '" + tokens[current].text +
+                            "' (Previous: '" + (current > 0 ? tokens[current - 1].text : "") + "')");
     }
 
     unique_ptr<Stmt> parse_block() {
@@ -201,7 +224,7 @@ private:
                 consume(TokenType::RBRACE, "Expected '}' to close 'private' block");
             
             } else {
-                throw runtime_error("Expected 'private' or 'public' block inside class");
+                throw runtime_error(where() + "Expected 'private' or 'public' block inside class");
             }
         }
 
@@ -311,7 +334,7 @@ private:
         if (match(TokenType::CHAR)) return TokenType::CHAR;
         if (match(TokenType::BOOL)) return TokenType::BOOL;
         if (match(TokenType::VOID)) return TokenType::VOID;
-        throw runtime_error("Expected a type");
+        throw runtime_error(where() + "Expected a type");
     }
 
     TokenType parse_decl_type(string& out_class_name) {
@@ -332,7 +355,7 @@ private:
             ++current;
             return TokenType::IDENTIFIER; 
         }
-        throw runtime_error("Expected a type or class name");
+        throw runtime_error(where() + "Expected a type or class name");
     }
 
     unique_ptr<Stmt> parse_declaration() {
@@ -362,7 +385,7 @@ private:
         if (match(TokenType::EQUALS)) {
             initializer = parse_logic();
         } else if (is_const) {
-            throw runtime_error("Constants must be initialized on declaration");
+            throw runtime_error(where() + "Constants must be initialized on declaration");
         } else {
              if (!is_array) {
                 if (type == TokenType::INT32 || type == TokenType::INT64) {
@@ -524,6 +547,6 @@ private:
             consume(TokenType::RPAREN, "Expected ')'");
             return expr;
         }
-        throw runtime_error("Expected a value, variable, or '('");
+        throw runtime_error(where() + "Expected a value, variable, or '('");
     }
 };

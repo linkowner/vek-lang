@@ -1,0 +1,5 @@
+// Error test: unterminated string literal on line 3
+func main() int {
+    let str greeting = "hello;
+    ret 0;
+}

@@ -1,0 +1,6 @@
+// Error test: missing ';' (statement on line 4, error surfaces at line 5)
+func main() int {
+    let int count = 3;
+    print(count)
+    ret 0;
+}

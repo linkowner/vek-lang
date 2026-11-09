@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <vector>
 #include <cctype>
 #include <algorithm>
@@ -62,6 +61,14 @@ class Lexer {
     size_t start = 0;
     size_t current = 0;
 
+    // Line/column of the next character to be consumed (both 1-based)
+    size_t line = 1;
+    size_t column = 1;
+
+    // Line/column of the start of the token currently being scanned
+    size_t start_line = 1;
+    size_t start_column = 1;
+
     // Helpers
     bool is_at_end() const { return current >= source.size(); }
 
@@ -70,7 +77,7 @@ class Lexer {
             unsigned char c = static_cast<unsigned char>(peek());
             
             if (std::isspace(c) || c < 32 || c > 126) {
-                ++current;
+                next();
             } else {
                 break;
             }
@@ -81,19 +88,19 @@ class Lexer {
         while(!is_at_end()) {
             const unsigned char c = static_cast<unsigned char>(peek());
             if (!std::isalnum(c) && c != '_') break;
-            ++current;
+            next();
         }
     }
 
     void number() {
         while(!is_at_end() && std::isdigit(static_cast<unsigned char>(peek()))) {
-            ++current;
+            next();
         }
         if (!is_at_end() && peek() == '.') {
             if (current + 1 < source.size() && std::isdigit(static_cast<unsigned char>(source[current + 1]))) {
-                ++current;
+                next();
                 while(!is_at_end() && std::isdigit(static_cast<unsigned char>(peek()))) {
-                    ++current;
+                    next();
                 }
             }
         }
@@ -103,8 +110,14 @@ class Lexer {
         return Token{
             .type = type,
             .text = source.substr(start, current - start),
-            .location = SourceLocation{.offset = start}
+            .location = SourceLocation{.offset = start, .line = start_line, .column = start_column}
         };
+    }
+
+    // Throws with the location of the token currently being scanned
+    [[noreturn]] void error(const string& message) const {
+        throw runtime_error("[Line " + std::to_string(start_line) +
+                            ", Col " + std::to_string(start_column) + "] " + message);
     }
 
     char decode_escape(char c) {
@@ -121,20 +134,20 @@ class Lexer {
         while (!is_at_end() && peek() != quote) {
             if (peek() == '\\') {
                 next();
-                if (is_at_end()) throw runtime_error("Unterminated escape sequence");
+                if (is_at_end()) error("Unterminated escape sequence");
                 value += decode_escape(next());
             } else {
                 value += next();
             }
         }
-        if (is_at_end()) throw runtime_error("Unterminated literal");
+        if (is_at_end()) error("Unterminated literal");
         next();
         return value;
     }
 
     Token scan_char(char quote) {
-        std::string v = scan_quoted(quote);
-        if (v.size() != 1) throw runtime_error("Char literal must contain exactly one character");
+        string v = scan_quoted(quote);
+        if (v.size() != 1) error("Char literal must contain exactly one character");
         Token token = make_token(TokenType::CHAR_LITERAL);
         token.text = std::move(v);
         return token;
@@ -153,7 +166,14 @@ class Lexer {
 
     char next() {
         if(is_at_end()) { return '\0'; }
-        return source[current++];
+        const char c = source[current++];
+        if (c == '\n') {
+            ++line;
+            column = 1;
+        } else {
+            ++column;
+        }
+        return c;
     }
 public:
     explicit Lexer(const string& src) : source(src) {}
@@ -164,6 +184,8 @@ public:
             if(is_at_end()) break;
 
             start = current;
+            start_line = line;
+            start_column = column;
             const char c = next();
 
             switch(c) {
@@ -185,7 +207,7 @@ public:
                         next();
                         tokens.push_back(make_token(TokenType::AND));
                     } else {
-                        throw runtime_error("Unexpected character '&'");
+                        error("Unexpected character '&'");
                     }
                     break;
                 case '|':
@@ -193,7 +215,7 @@ public:
                         next();
                         tokens.push_back(make_token(TokenType::OR));
                     } else {
-                        throw runtime_error("Unexpected character '|'");
+                        error("Unexpected character '|'");
                     }
                     break;
 
@@ -208,7 +230,7 @@ public:
                         next(); 
                         tokens.push_back(make_token(TokenType::COLON_COLON)); 
                     } else { 
-                        throw runtime_error("Unexpected character ':'"); 
+                        error("Unexpected character ':'"); 
                     }
                     break;
                 
@@ -311,8 +333,8 @@ public:
                             tokens.push_back(make_token(TokenType::INT64_LITERAL));
                         }
                     } else { 
-                        std::cout << "Unknown character: '" << c << "' (ASCII: " << (int)c << ")\n";
-                        throw runtime_error("Unexpected character."); 
+                        error("Unknown character: '" + string(1, c) +
+                              "' (ASCII: " + std::to_string(static_cast<int>(static_cast<unsigned char>(c))) + ")");
                     }
                     break;
             }

@@ -1,0 +1,31 @@
+func double_value(int value) int {
+    ret value * 2;
+}
+
+func main() int {
+    let int count = 3;
+    let float int_to_float = (float)count;
+    const str label = "Vek";
+    let int scores[] = {90, 45, 85};
+    scores.push(100);
+    let int last = scores.pop();
+
+    for (let int i = 0; i < 3; i += 1) {
+        print(scores[i]);
+    }
+
+    if (count > 0) {
+        print("positive");
+    } else {
+        print("not positive");
+    }
+
+    while (count > 0) {
+        count = count - 1;
+    }
+
+    print(double_value(21));
+    print(label);
+    print(last);
+    ret 0;
+}

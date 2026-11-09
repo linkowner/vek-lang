@@ -1,0 +1,11 @@
+// Error test: unknown character after comments and blank lines
+func main() int {
+    # hash comment
+    // slash comment
+
+    let int a = 1;
+    a = a + 1; // trailing comment
+
+    let int b = 2; # trailing hash comment
+    ret @ a;
+}

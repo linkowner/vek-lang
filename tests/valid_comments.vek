@@ -1,0 +1,26 @@
+// Valid program: exercises comments, blank lines, escapes, casts, loops, strings
+func main() int {
+    # hash-style comment
+    // slash-style comment
+
+    let int total = 0;
+    let float f = 3.14f;
+    let float64 d = 2.71d;
+
+    for (let int i = 0; i < 5; i += 1) {
+        total = total + i;
+    }
+
+    let str msg = "tabs\tand\tnewlines\nwork";
+    total = (int)f + (int)d + total;
+
+    if (total > 10) {
+        print(msg);
+    }
+
+    while (total > 12) {
+        total = total - 1;
+    }
+    print(total);
+    ret 0;
+}
