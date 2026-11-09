@@ -9,9 +9,16 @@
 **Vek** is a fast, statically-typed, bytecode-compiled programming language with its own custom stack-based Virtual Machine (similar to Java and the JVM). 
 It is designed to be simple, bridging the syntax of C++ and Java with some of the flexibility seen in JavaScript.
 
-Compile using :
+Build with CMake (produces `vek` and `vekvm` in `build/`):
 ```bash
-g++ vek.cpp -o vek; g++ vekvm.cpp -o vekvm
+cmake -S . -B build
+cmake --build build -j
+```
+The standard library is loaded relative to the project root, so run the binaries from there (e.g. `./build/vek run tests/hello.vek`).
+
+Quick start without CMake (needs C++17, so pass `-std=c++17`):
+```bash
+g++ -std=c++17 vek.cpp -o vek; g++ -std=c++17 vekvm.cpp -o vekvm
 ```
 
 [![Download VekLang](https://img.shields.io/badge/Download-v0.0.1-green?style=for-the-badge&logo=windows)](https://github.com/vek-language/vek-lang/releases/latest)  
@@ -77,7 +84,7 @@ func main() int {
 - [ ] Organize src .cpp files instead of using .hpp only.
 - [ ] Add classes.
 - [x] Implement while/for loops.
-- [ ] CMake file.
+- [x] CMake file.
 - [x] Compiler and VM supposed to be different things. (_vekvm {filename}.vekbc_ to run, _vek run/build_ - developer tool) (turn .vekbc is a bytecode file, with magic, 3 bytes in header.)
 
 ## Acknowledgements

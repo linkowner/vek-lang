@@ -1,0 +1,4 @@
+func main() int {
+    print("hello");
+    ret 0;
+}
