@@ -12,17 +12,25 @@ using std::move;
 
 struct Expr { virtual ~Expr() = default; };
 
-struct Int32Literal : Expr { int32_t value; Int32Literal(int32_t v) : value(v) {} };
-struct Int64Literal : Expr { int64_t value; Int64Literal(int64_t v) : value(v) {} };
-struct Float32Literal : Expr { float value; Float32Literal(float v) : value(v) {} };
-struct Float64Literal : Expr { double value; Float64Literal(double v) : value(v) {} };
-struct BoolLiteral : Expr { bool value; BoolLiteral(bool v) : value(v) {} };
-struct StringLiteral : Expr { string value; StringLiteral(string v) : value(move(v)) {} };
-struct CharLiteral : Expr { char value; CharLiteral(char v) : value(v) {} };
+struct Int32Literal : Expr { int32_t value; Int32Literal(int32_t value) : value(value) {} };
+struct Int64Literal : Expr { int64_t value; Int64Literal(int64_t value) : value(value) {} };
+struct Float32Literal : Expr { float value; Float32Literal(float value) : value(value) {} };
+struct Float64Literal : Expr { double value; Float64Literal(double value) : value(value) {} };
+struct BoolLiteral : Expr { bool value; BoolLiteral(bool value) : value(value) {} };
+struct StringLiteral : Expr { string value; StringLiteral(string value) : value(move(value)) {} };
+struct CharLiteral : Expr { char value; CharLiteral(char value) : value(value) {} };
 
 struct VariableExpr : Expr {
     string name;
-    VariableExpr(string n) : name(move(n)) {}
+    VariableExpr(string n) 
+        : name(move(n)) {}
+};
+
+struct FieldAccessExpr : Expr {
+    unique_ptr<Expr> object;
+    string field;
+    FieldAccessExpr(unique_ptr<Expr> obj, string f)
+        : object(move(obj)), field(move(f)) {}
 };
 
 struct AssignExpr : Expr {
@@ -30,31 +38,35 @@ struct AssignExpr : Expr {
     TokenType op;
     unique_ptr<Expr> value;
 
-    AssignExpr(string n, TokenType o, unique_ptr<Expr> v)
-        : name(move(n)), op(o), value(move(v)) {}
+    AssignExpr(string n, TokenType operation, unique_ptr<Expr> value)
+        : name(move(name)), op(operation), value(move(value)) {}
 };
 
 struct CastExpr : Expr {
     TokenType target_type;
     unique_ptr<Expr> expr;
-    CastExpr(TokenType t, unique_ptr<Expr> e) : target_type(t), expr(move(e)) {}
+    CastExpr(TokenType token_type, unique_ptr<Expr> e) 
+        : target_type(token_type), expr(move(e)) {}
 };
 
 struct UnaryExpr : Expr {
     TokenType op;
     unique_ptr<Expr> right;
-    UnaryExpr(TokenType o, unique_ptr<Expr> r) : op(o), right(move(r)) {}
+    UnaryExpr(TokenType operation, unique_ptr<Expr> r) 
+        : op(operation), right(move(r)) {}
 };
 
 struct ArrayAccessExpr : Expr {
     unique_ptr<Expr> array;
     unique_ptr<Expr> index;
-    ArrayAccessExpr(unique_ptr<Expr> a, unique_ptr<Expr> i) : array(move(a)), index(move(i)) {}
+    ArrayAccessExpr(unique_ptr<Expr> a, unique_ptr<Expr> i) 
+        : array(move(a)), index(move(i)) {}
 };
 
 struct ArrayLiteral : Expr {
     vector<unique_ptr<Expr>> elements;
-    ArrayLiteral(vector<unique_ptr<Expr>> e) : elements(move(e)) {}
+    ArrayLiteral(vector<unique_ptr<Expr>> e) 
+        : elements(move(e)) {}
 };
 
 struct MethodCallExpr : Expr {
@@ -69,14 +81,16 @@ struct MethodCallExpr : Expr {
 struct CallExpr : Expr {
     string name;
     vector<unique_ptr<Expr>> arguments;
-    CallExpr(string n, vector<unique_ptr<Expr>> args) : name(move(n)), arguments(move(args)) {}
+    CallExpr(string name, vector<unique_ptr<Expr>> args) 
+        : name(move(name)), arguments(move(args)) {}
 };
 
 struct BinaryExpr : Expr {
     unique_ptr<Expr> left;
     TokenType op;
     unique_ptr<Expr> right;
-    BinaryExpr(unique_ptr<Expr> l, TokenType o, unique_ptr<Expr> r) : left(move(l)), op(o), right(move(r)) {}
+    BinaryExpr(unique_ptr<Expr> l, TokenType operation, unique_ptr<Expr> r) 
+        : left(move(l)), op(operation), right(move(r)) {}
 };
 
 struct Stmt { virtual ~Stmt() = default; };
@@ -84,12 +98,14 @@ struct Stmt { virtual ~Stmt() = default; };
 struct LoadStmt : Stmt {
     string filepath;
     bool is_stdlib;
-    LoadStmt(string path, bool stdlib) : filepath(move(path)), is_stdlib(stdlib) {}
+    LoadStmt(string path, bool stdlib) 
+        : filepath(move(path)), is_stdlib(stdlib) {}
 };
 
 struct ExprStmt : Stmt {
     unique_ptr<Expr> expression;
-    ExprStmt(unique_ptr<Expr> expr) : expression(move(expr)) {}
+    ExprStmt(unique_ptr<Expr> expr) 
+        : expression(move(expr)) {}
 };
 
 struct VarDecl : Stmt {
@@ -99,24 +115,30 @@ struct VarDecl : Stmt {
     bool is_const;
     unique_ptr<Expr> array_size;
     unique_ptr<Expr> initializer;
-    VarDecl(TokenType t, string n, bool is_arr, bool is_c, unique_ptr<Expr> size, unique_ptr<Expr> init)
-            : type(t), name(move(n)), is_array(is_arr), is_const(is_c), array_size(move(size)), initializer(move(init)) {}
+    string class_name;
+    VarDecl(TokenType token_type, string n, bool is_arr, bool is_c,
+            unique_ptr<Expr> size, unique_ptr<Expr> init, string cls = "")
+        : type(token_type), name(move(n)), is_array(is_arr), is_const(is_c),
+          array_size(move(size)), initializer(move(init)), class_name(move(cls)) {}
 };
 
 struct AssignStmt : Stmt {
     unique_ptr<Expr> target;
     unique_ptr<Expr> value;
-    AssignStmt(unique_ptr<Expr> t, unique_ptr<Expr> v) : target(move(t)), value(move(v)) {}
+    AssignStmt(unique_ptr<Expr> token_type, unique_ptr<Expr> value) 
+        : target(move(token_type)), value(move(value)) {}
 };
 
 struct PrintStmt : Stmt {
     unique_ptr<Expr> expression;
-    PrintStmt(unique_ptr<Expr> expr) : expression(move(expr)) {}
+    PrintStmt(unique_ptr<Expr> expr) 
+        : expression(move(expr)) {}
 };
 
 struct BlockStmt : Stmt {
     vector<unique_ptr<Stmt>> statements;
-    BlockStmt(vector<unique_ptr<Stmt>> s) : statements(move(s)) {}
+    BlockStmt(vector<unique_ptr<Stmt>> s) 
+        : statements(move(s)) {}
 };
 
 struct IfStmt : Stmt {
@@ -148,7 +170,18 @@ struct ForStmt : Stmt {
 struct Param {
     TokenType type;
     string name;
-    Param(TokenType t, string n) : type(t), name(move(n)) {}
+    Param(TokenType token_type, string n) : type(token_type), name(move(n)) {}
+};
+
+struct ClassDecl : Stmt {
+    string name;
+
+    vector<unique_ptr<Stmt>> public_members;
+    vector<unique_ptr<Stmt>> private_members;
+    vector<unique_ptr<Stmt>> protected_members;
+
+    ClassDecl(string n) 
+        : name(move(n)) {}
 };
 
 struct FuncDecl : Stmt {
@@ -162,5 +195,6 @@ struct FuncDecl : Stmt {
 
 struct ReturnStmt : Stmt {
     unique_ptr<Expr> value;
-    ReturnStmt(unique_ptr<Expr> v) : value(move(v)) {}
+    ReturnStmt(unique_ptr<Expr> value) 
+        : value(move(value)) {}
 };

@@ -116,6 +116,7 @@ private:
             return parse_declaration();
         }
         
+        if (check(TokenType::CLASS)) return parse_class();
         if (check(TokenType::FUNC)) return parse_function();
         if (check(TokenType::IF)) return parse_if();
         if (check(TokenType::WHILE)) return parse_while();
@@ -166,6 +167,46 @@ private:
 
         consume(TokenType::RBRACE, "Expected '}'");
         return make_unique<BlockStmt>(move(body));
+    }
+
+    unique_ptr<Stmt> parse_class_member() {
+        if (check(TokenType::FUNC)) {
+            return parse_function();
+        }
+        
+        return parse_declaration();
+    }
+    
+    unique_ptr<Stmt> parse_class() {
+        consume(TokenType::CLASS, "Expected 'class'");
+
+        Token name = consume(TokenType::IDENTIFIER, "Excepted class name");
+        consume(TokenType::LBRACE, "Expected '{'");
+
+        auto class_decl = make_unique<ClassDecl>(name.text);
+        while (!check(TokenType::RBRACE) && !is_at_end()) {
+            // Access modifiers
+            if(match(TokenType::PUBLIC)) {
+                consume(TokenType::LBRACE, "Expected '{' after 'public'");
+                while (!check(TokenType::RBRACE) && !is_at_end()) {
+                    class_decl->public_members.push_back(parse_class_member());
+                }
+                consume(TokenType::RBRACE, "Expected '}' to close 'public' block");
+
+            } else if(match(TokenType::PRIVATE)) {
+                consume(TokenType::LBRACE, "Expected '{' after 'private'");
+                while (!check(TokenType::RBRACE) && !is_at_end()) {
+                    class_decl->private_members.push_back(parse_class_member());
+                }
+                consume(TokenType::RBRACE, "Expected '}' to close 'private' block");
+            
+            } else {
+                throw runtime_error("Expected 'private' or 'public' block inside class");
+            }
+        }
+
+        consume(TokenType::RBRACE, "Expected '}' after class declaration");
+        return class_decl;
     }
     
     unique_ptr<Stmt> parse_if() {
@@ -273,6 +314,27 @@ private:
         throw runtime_error("Expected a type");
     }
 
+    TokenType parse_decl_type(string& out_class_name) {
+        out_class_name.clear();
+        if (check(TokenType::INT32) 
+            || check(TokenType::INT64) 
+            || check(TokenType::FLOAT32) 
+            || check(TokenType::FLOAT64)
+            || check(TokenType::STR)
+            || check(TokenType::CHAR)
+            || check(TokenType::BOOL)
+            || check(TokenType::VOID))
+        {
+            return parse_type();
+        }
+        if (check(TokenType::IDENTIFIER)) {
+            out_class_name = tokens[current].text;
+            ++current;
+            return TokenType::IDENTIFIER; 
+        }
+        throw runtime_error("Expected a type or class name");
+    }
+
     unique_ptr<Stmt> parse_declaration() {
         bool is_const = false;
         
@@ -299,6 +361,22 @@ private:
         unique_ptr<Expr> initializer = nullptr;
         if (match(TokenType::EQUALS)) {
             initializer = parse_logic();
+        } else if (is_const) {
+            throw runtime_error("Constants must be initialized on declaration");
+        } else {
+             if (!is_array) {
+                if (type == TokenType::INT32 || type == TokenType::INT64) {
+                    initializer = make_unique<Int64Literal>(0);
+                } else if (type == TokenType::FLOAT32 || type == TokenType::FLOAT64) {
+                    initializer = make_unique<Float64Literal>(0.0);
+                } else if (type == TokenType::BOOL) {
+                    initializer = make_unique<BoolLiteral>(false);
+                } else if (type == TokenType::STR) {
+                    initializer = make_unique<StringLiteral>("");
+                } else if (type == TokenType::CHAR) {
+                    initializer = make_unique<CharLiteral>('\0');
+                }
+            }
         }
         
         consume(TokenType::SEMICOLON, "Expected ';'");

@@ -12,7 +12,7 @@ struct SourceLocation {
 
 enum class TokenType {
     // Basic
-    LOAD,
+    LOAD, CLASS, PUBLIC, PRIVATE, PROTECTED,
     
     LET, CONST, FUNC, 
     IF, ELSE, WHILE, FOR,    
