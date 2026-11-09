@@ -1,0 +1,33 @@
+// Const enforcement: compound assignment (+=, -=, *=, /=) must NOT be able to
+// mutate a `const` variable. Previously only plain `=` was checked (in
+// compile_assign), while compound assignments compile through compile_expr's
+// AssignExpr branch and bypassed the guard entirely, so `C += 1` silently
+// changed a constant.
+//
+// Expected behavior (compiler.hpp):
+//   const int C = 100; C += 1;  ->  [Error] Cannot reassign constant variable 'C'
+//   const int C = 100; C -= 1;  ->  [Error] Cannot reassign constant variable 'C'
+//   const int C = 100; C *= 2;  ->  [Error] Cannot reassign constant variable 'C'
+//   const int C = 100; C /= 2;  ->  [Error] Cannot reassign constant variable 'C'
+// All four are rejected at compile time with the same message as plain `=`,
+// and the process exits non-zero without running the program.
+//
+// The first case below is live; `./vek run tests/const_compound.vek` prints the
+// error and exits 1. Uncomment the other lines one at a time to verify them
+// (only one compound assignment per program can be reached, since the first
+// one aborts compilation).
+//
+// Regressions that must keep working:
+//   let int x = 10; x += 5; print(x);   ->  15
+//   for (let int i = 0; i < 3; i += 1)  ->  loops fine (const j in the
+//                                          increment slot is instead rejected)
+
+func main() int {
+    const int C = 100;
+    C += 1;     // rejected: [Error] Cannot reassign constant variable 'C'
+    // C -= 1;  // rejected: same error
+    // C *= 2;  // rejected: same error
+    // C /= 2;  // rejected: same error
+    print(C);   // unreachable: compilation stops at the line above
+    ret 0;
+}
