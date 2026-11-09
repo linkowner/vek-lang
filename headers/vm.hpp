@@ -117,8 +117,9 @@ public:
             switch(instruction) {
                 // Push
                 case OpCode::OP_CONSTANT: {
-                    uint8_t constant_index = bytecode.code[ip++];
-                    push(bytecode.constants[constant_index]);
+                    size_t constant_index = bytecode.read_u16(ip);
+                    ip += 2;
+                    push(bytecode.get_const(constant_index));
                     break;
                 }
 
@@ -241,14 +242,16 @@ public:
 
                 // Variables
                 case OpCode::OP_DEFINE_VAR: {
-                    uint8_t name_index = bytecode.code[ip++];
-                    string var_name = get<string>(bytecode.constants[name_index]);
+                    size_t name_index = bytecode.read_u16(ip);
+                    ip += 2;
+                    string var_name = get<string>(bytecode.get_const(name_index));
                     scopes.back()[var_name] = pop();
                     break;
                 }
                 case OpCode::OP_SAVE: {
-                    uint8_t name_index = bytecode.code[ip++];
-                    string var_name = get<string>(bytecode.constants[name_index]);
+                    size_t name_index = bytecode.read_u16(ip);
+                    ip += 2;
+                    string var_name = get<string>(bytecode.get_const(name_index));
                     Value val = pop();
                     
                     bool found = false;
@@ -266,8 +269,9 @@ public:
                     break;
                 }
                 case OpCode::OP_LOAD: {
-                    uint8_t name_index = bytecode.code[ip++];
-                    string var_name = get<string>(bytecode.constants[name_index]);
+                    size_t name_index = bytecode.read_u16(ip);
+                    ip += 2;
+                    string var_name = get<string>(bytecode.get_const(name_index));
                     int i = (int)scopes.size() - 1;
                     for (; i >= 0; i--) {
                         auto it = scopes[i].find(var_name);
@@ -414,9 +418,11 @@ public:
 
                 // Functions
                 case OpCode::OP_CALL: {
-                    uint8_t name_index = bytecode.code[ip++];
-                    uint8_t arg_count = bytecode.code[ip++];
-                    string func_name = get<string>(bytecode.constants[name_index]);
+                    // Operand layout: [name index: u16][argument count: u8]
+                    size_t name_index = bytecode.read_u16(ip);
+                    ip += 2;
+                    [[maybe_unused]] uint8_t arg_count = bytecode.code[ip++];
+                    string func_name = get<string>(bytecode.get_const(name_index));
                     call_stack.push_back(ip);
                     scope_base_stack.push_back(scopes.size());
                     scopes.push_back({});
@@ -441,15 +447,16 @@ public:
 
                 // Flow control
                 case OpCode::OP_JUMP: {
-                    uint8_t high = bytecode.code[ip++];
-                    uint8_t low = bytecode.code[ip++];
-                    ip = (high << 8) | low;
+                    uint16_t target = bytecode.read_u16(ip);
+                    ip += 2;
+                    if (target >= bytecode.code.size()) throw runtime_error("Jump target out of bounds");
+                    ip = target;
                     break;
                 }
                 case OpCode::OP_JUMP_IF_FALSE: {
-                    uint8_t high = bytecode.code[ip++];
-                    uint8_t low = bytecode.code[ip++];
-                    uint16_t target = (high << 8) | low;
+                    uint16_t target = bytecode.read_u16(ip);
+                    ip += 2;
+                    if (target >= bytecode.code.size()) throw runtime_error("Jump target out of bounds");
                     
                     Value condition = pop();
                     bool is_truthy = false;
@@ -466,9 +473,9 @@ public:
                     break;
                 }
                 case OpCode::OP_JUMP_IF_TRUE: {
-                    uint8_t high = bytecode.code[ip++];
-                    uint8_t low = bytecode.code[ip++];
-                    uint16_t target = (high << 8) | low;
+                    uint16_t target = bytecode.read_u16(ip);
+                    ip += 2;
+                    if (target >= bytecode.code.size()) throw runtime_error("Jump target out of bounds");
                     
                     Value condition = pop();
                     bool is_truthy = false;

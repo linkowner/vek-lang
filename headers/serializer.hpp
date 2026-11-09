@@ -19,17 +19,29 @@ using std::holds_alternative;
     .vkc File Format
     ------------------
     [4 bytes] Magic Number ("VEKL")
+    [4 bytes] Format version (uint32, currently 2)
     [4 bytes] Code size (uint32)
     [N bytes] Code array
     [4 bytes] Constant count (uint32)
     [N bytes] Constants (tag + data)
     [4 bytes] Function count (uint32)
     [N bytes] Functions (name length + name + address)
+
+    Version history:
+      1 - original format. Constant indices were a single byte, so programs
+          with more than 255 constants were silently corrupted.
+      2 - constant-pool indices widened to 16-bit big-endian operands
+          (OP_CONSTANT, OP_DEFINE_VAR, OP_SAVE, OP_LOAD and OP_CALL's name
+          index). Jump operands are unchanged (16-bit big-endian, as before).
+          Files written by version 1 builds are NOT readable: the operand
+          encoding lives inside the code blob, so load() rejects them via the
+          version field instead of executing them wrongly.
 */
 
 class Serializer {
 private:
     static constexpr uint32_t MAGIC_NUMBER = 0x56454B4C; // VEKL
+    static constexpr uint32_t FORMAT_VERSION = 2;
 
     // Write helpers
     static void write_u8(ofstream& out, uint8_t val) {
@@ -116,6 +128,9 @@ public:
         // Write magic number
         write_u32(file, MAGIC_NUMBER);
 
+        // Write format version
+        write_u32(file, FORMAT_VERSION);
+
         // Code
         write_u32(file, static_cast<uint32_t>(bytecode.code.size()));
         file.write(reinterpret_cast<const char*>(bytecode.code.data()), bytecode.code.size());
@@ -159,6 +174,16 @@ public:
         // Check magic number
         if (read_u32(file) != MAGIC_NUMBER) {
             throw runtime_error("Invalid VekLang bytecode file.");
+        }
+
+        // Check format version. A version mismatch means the operand encoding
+        // inside the code blob changed, so the file cannot be executed safely.
+        uint32_t version = read_u32(file);
+        if (version != FORMAT_VERSION) {
+            throw runtime_error(
+                "Unsupported VekLang bytecode format version " + std::to_string(version) +
+                " (expected " + std::to_string(FORMAT_VERSION) +
+                "). Recompile the program with a matching 'vek build'.");
         }
 
         // Code

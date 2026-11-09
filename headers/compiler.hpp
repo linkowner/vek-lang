@@ -97,11 +97,6 @@ private:
     bool is_numeric(Type t) { return t == Type::INT32 || t == Type::INT64 || t == Type::FLOAT32 || t == Type::FLOAT64; }
     bool is_assignable(Type target, Type source) { return target == source || (is_numeric(target) && is_numeric(source)); }
 
-    void patch_jump(Bytecode& bytecode, size_t jump_index, size_t target) {
-        bytecode.code[jump_index] = (target >> 8) & 0xFF;
-        bytecode.code[jump_index + 1] = target & 0xFF;
-    }
-
     // Module loading
     string resolve_load_path(LoadStmt* stmt) {
         if (stmt->is_stdlib) return "libs/" + stmt->filepath + ".vek";
@@ -171,7 +166,7 @@ private:
         push_scope();
         for (const auto& param : func->params) {
             int name_idx = bytecode.add_const(param.name);
-            bytecode.emit(OpCode::OP_DEFINE_VAR, name_idx);
+            bytecode.emit_const(OpCode::OP_DEFINE_VAR, name_idx);
             set_var_type(param.name, token_to_type(param.type));
         }
         
@@ -185,20 +180,20 @@ private:
     void compile_if(IfStmt* stmt, Bytecode& bytecode) {
         compile_expr(stmt->condition.get(), bytecode, Type::BOOL);
             
-        bytecode.emit(OpCode::OP_JUMP_IF_FALSE, 0, 0);
+        bytecode.emit_jump(OpCode::OP_JUMP_IF_FALSE);
         size_t jump_if_false = bytecode.code.size() - 2;
         
         compile_stmt(stmt->then_branch.get(), bytecode);
         
         if (stmt->else_branch) {
-            bytecode.emit(OpCode::OP_JUMP, 0, 0);
+            bytecode.emit_jump(OpCode::OP_JUMP);
             size_t jump_over_else = bytecode.code.size() - 2;
             
-            patch_jump(bytecode, jump_if_false, bytecode.code.size());
+            bytecode.patch_jump(jump_if_false, bytecode.code.size());
             compile_stmt(stmt->else_branch.get(), bytecode);
-            patch_jump(bytecode, jump_over_else, bytecode.code.size());
+            bytecode.patch_jump(jump_over_else, bytecode.code.size());
         } else {
-            patch_jump(bytecode, jump_if_false, bytecode.code.size());
+            bytecode.patch_jump(jump_if_false, bytecode.code.size());
         }
     }
 
@@ -206,13 +201,13 @@ private:
         size_t loop_start = bytecode.code.size();
         compile_expr(stmt->condition.get(), bytecode, Type::BOOL);
 
-        bytecode.emit(OpCode::OP_JUMP_IF_FALSE, 0, 0);
+        bytecode.emit_jump(OpCode::OP_JUMP_IF_FALSE);
         size_t exit_jump = bytecode.code.size() - 2;
 
         compile_stmt(stmt->body.get(), bytecode);
 
-        bytecode.emit(OpCode::OP_JUMP, (loop_start >> 8) & 0xFF, loop_start & 0xFF);
-        patch_jump(bytecode, exit_jump, bytecode.code.size());
+        bytecode.emit_jump(OpCode::OP_JUMP, loop_start);
+        bytecode.patch_jump(exit_jump, bytecode.code.size());
     }
 
     void compile_for(ForStmt* stmt, Bytecode& bytecode) {
@@ -228,7 +223,7 @@ private:
         size_t exit_jump = 0;
         if (stmt->condition) {
             compile_expr(stmt->condition.get(), bytecode, Type::BOOL);
-            bytecode.emit(OpCode::OP_JUMP_IF_FALSE, 0, 0);
+            bytecode.emit_jump(OpCode::OP_JUMP_IF_FALSE);
             exit_jump = bytecode.code.size() - 2;
         }
 
@@ -241,10 +236,10 @@ private:
             }
         }
 
-        bytecode.emit(OpCode::OP_JUMP, (loop_start >> 8) & 0xFF, loop_start & 0xFF);
+        bytecode.emit_jump(OpCode::OP_JUMP, loop_start);
 
         if (stmt->condition) {
-            patch_jump(bytecode, exit_jump, bytecode.code.size());
+            bytecode.patch_jump(exit_jump, bytecode.code.size());
         }
 
         bytecode.emit(OpCode::OP_EXIT_SCOPE);
@@ -263,18 +258,18 @@ private:
             if (auto* arr_lit = dynamic_cast<ArrayLiteral*>(var_decl->initializer.get())) {
                 int64_t size = arr_lit->elements.size();
                 int idx = bytecode.add_const(size);
-                bytecode.emit(OpCode::OP_CONSTANT, idx);
+                bytecode.emit_const(OpCode::OP_CONSTANT, idx);
                 
                 bytecode.emit(OpCode::OP_NEW_ARRAY);
                 int name_index = bytecode.add_const(var_decl->name);
-                bytecode.emit(OpCode::OP_DEFINE_VAR, name_index);
+                bytecode.emit_const(OpCode::OP_DEFINE_VAR, name_index);
 
                 for (size_t i = 0; i < arr_lit->elements.size(); ++i) {
                     int var_idx = bytecode.add_const(var_decl->name);
-                    bytecode.emit(OpCode::OP_LOAD, var_idx);
+                    bytecode.emit_const(OpCode::OP_LOAD, var_idx);
 
                     int idx_val = bytecode.add_const((int64_t)i);
-                    bytecode.emit(OpCode::OP_CONSTANT, idx_val);
+                    bytecode.emit_const(OpCode::OP_CONSTANT, idx_val);
 
                     compile_expr(arr_lit->elements[i].get(), bytecode, declared_type);
                     bytecode.emit(OpCode::OP_SET_INDEX);
@@ -285,13 +280,13 @@ private:
                 compile_expr(var_decl->array_size.get(), bytecode, Type::INT64);
                 bytecode.emit(OpCode::OP_NEW_ARRAY);
                 int name_index = bytecode.add_const(var_decl->name);
-                bytecode.emit(OpCode::OP_DEFINE_VAR, name_index);
+                bytecode.emit_const(OpCode::OP_DEFINE_VAR, name_index);
                 handled = true;
             }
             else if (var_decl->initializer) {
                 compile_expr(var_decl->initializer.get(), bytecode, Type::ARRAY);
                 int name_index = bytecode.add_const(var_decl->name);
-                bytecode.emit(OpCode::OP_DEFINE_VAR, name_index);
+                bytecode.emit_const(OpCode::OP_DEFINE_VAR, name_index);
                 handled = true;
             }
 
@@ -301,7 +296,7 @@ private:
         } else {
             compile_expr(var_decl->initializer.get(), bytecode, declared_type);
             int name_index = bytecode.add_const(var_decl->name);
-            bytecode.emit(OpCode::OP_DEFINE_VAR, name_index);
+            bytecode.emit_const(OpCode::OP_DEFINE_VAR, name_index);
         }
     }
 
@@ -314,7 +309,7 @@ private:
             Type target_type = get_var_type(var->name);
             compile_expr(assign_stmt->value.get(), bytecode, target_type);
             int name_index = bytecode.add_const(var->name);
-            bytecode.emit(OpCode::OP_SAVE, name_index);
+            bytecode.emit_const(OpCode::OP_SAVE, name_index);
         } else if (auto* arr_access = dynamic_cast<ArrayAccessExpr*>(assign_stmt->target.get())) {
             compile_expr(arr_access->array.get(), bytecode);
             compile_expr(arr_access->index.get(), bytecode);
@@ -335,7 +330,7 @@ private:
             compile_expr(ret_stmt->value.get(), bytecode, Type::UNKNOWN);
         } else {
             int idx = bytecode.add_const((int64_t)0);
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
         }
         bytecode.emit(OpCode::OP_RETURN);
     }
@@ -381,49 +376,49 @@ private:
         if (auto* i64 = dynamic_cast<Int64Literal*>(expr)) {
             if (expected_type == Type::INT32) {
                 int idx = bytecode.add_const(static_cast<int32_t>(i64->value));
-                bytecode.emit(OpCode::OP_CONSTANT, idx);
+                bytecode.emit_const(OpCode::OP_CONSTANT, idx);
                 return Type::INT32;
             }
 
             int idx = bytecode.add_const(static_cast<int64_t>(i64->value));
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::INT64;
         }
         if (auto* f64 = dynamic_cast<Float64Literal*>(expr)) {
             int idx = bytecode.add_const(static_cast<double>(f64->value));
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::FLOAT64;
         }
         if (auto* f32 = dynamic_cast<Float32Literal*>(expr)) {
             int idx = bytecode.add_const(static_cast<float>(f32->value));
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::FLOAT32;
         }
         if (auto* b = dynamic_cast<BoolLiteral*>(expr)) {
             int idx = bytecode.add_const(b->value);
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::BOOL;
         }
         if (auto* s = dynamic_cast<StringLiteral*>(expr)) {
             int idx = bytecode.add_const(s->value);
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::STR;
         }
         if (auto* c = dynamic_cast<CharLiteral*>(expr)) {
             int idx = bytecode.add_const(c->value);
-            bytecode.emit(OpCode::OP_CONSTANT, idx);
+            bytecode.emit_const(OpCode::OP_CONSTANT, idx);
             return Type::CHAR;
         }
         
         if (auto* var = dynamic_cast<VariableExpr*>(expr)) {
             int idx = bytecode.add_const(var->name);
-            bytecode.emit(OpCode::OP_LOAD, idx);
+            bytecode.emit_const(OpCode::OP_LOAD, idx);
             return get_var_type(var->name);
         }
 
         if (auto* assign_expr = dynamic_cast<AssignExpr*>(expr)) {
             int load_idx = bytecode.add_const(assign_expr->name);
-            bytecode.emit(OpCode::OP_LOAD, load_idx);
+            bytecode.emit_const(OpCode::OP_LOAD, load_idx);
             compile_expr(assign_expr->value.get(), bytecode, Type::UNKNOWN);
 
             switch (assign_expr->op) {
@@ -434,7 +429,7 @@ private:
                 default: throw runtime_error("Invalid assignment operator");
             }
 
-            bytecode.emit(OpCode::OP_SAVE, load_idx);
+            bytecode.emit_const(OpCode::OP_SAVE, load_idx);
             return Type::UNKNOWN;
         }
 
@@ -469,7 +464,12 @@ private:
                 compile_expr(it->get(), bytecode, Type::UNKNOWN);
             }
             int name_idx = bytecode.add_const(call->name);
-            bytecode.emit(OpCode::OP_CALL, name_idx, call->arguments.size());
+            if (call->arguments.size() > 255) {
+                throw runtime_error("Too many arguments in call to '" + call->name + "' (limit 255)");
+            }
+            // OP_CALL operand layout: [name index: u16][argument count: u8]
+            bytecode.emit_const(OpCode::OP_CALL, name_idx);
+            bytecode.write(static_cast<uint8_t>(call->arguments.size()));
             return function_return_types.count(call->name) ? function_return_types[call->name] : Type::UNKNOWN;
         }
 
@@ -494,25 +494,25 @@ private:
             if (bin->op == TokenType::AND) {
                 compile_expr(bin->left.get(), bytecode, Type::UNKNOWN);
                 bytecode.emit(OpCode::OP_DUPLICATE);
-                bytecode.emit(OpCode::OP_JUMP_IF_FALSE, 0, 0);
+                bytecode.emit_jump(OpCode::OP_JUMP_IF_FALSE);
                 size_t jump_if_false = bytecode.code.size() - 2;
                 
                 bytecode.emit(OpCode::OP_POP);
                 compile_expr(bin->right.get(), bytecode, Type::UNKNOWN);
                 
-                patch_jump(bytecode, jump_if_false, bytecode.code.size());
+                bytecode.patch_jump(jump_if_false, bytecode.code.size());
                 return Type::BOOL;
             }
             if (bin->op == TokenType::OR) {
                 compile_expr(bin->left.get(), bytecode, Type::UNKNOWN);
                 bytecode.emit(OpCode::OP_DUPLICATE);
-                bytecode.emit(OpCode::OP_JUMP_IF_TRUE, 0, 0);
+                bytecode.emit_jump(OpCode::OP_JUMP_IF_TRUE);
                 size_t jump_if_true = bytecode.code.size() - 2;
                 
                 bytecode.emit(OpCode::OP_POP);
                 compile_expr(bin->right.get(), bytecode, Type::UNKNOWN);
                 
-                patch_jump(bytecode, jump_if_true, bytecode.code.size());
+                bytecode.patch_jump(jump_if_true, bytecode.code.size());
                 return Type::BOOL;
             }
             
@@ -619,8 +619,7 @@ public:
         }
 
         // Jump over functions
-        bytecode.emit(OpCode::OP_JUMP, 0, 0);
-        size_t jump_placeholder = bytecode.code.size() - 2;
+        size_t jump_placeholder = bytecode.emit_jump(OpCode::OP_JUMP);
 
         // Compile non-main functions
         unordered_set<string> emitted_funcs;
@@ -645,10 +644,10 @@ public:
         if (functions.find("main") == functions.end()) {
             throw runtime_error("No 'main' function found.");
         }
-        uint16_t main_addr = (uint16_t)bytecode.code.size();
-        bytecode.function_addresses["main"] = main_addr;
-        bytecode.code[jump_placeholder] = (main_addr >> 8) & 0xFF;
-        bytecode.code[jump_placeholder + 1] = main_addr & 0xFF;
+        // Patch jump to main. patch_jump() validates that the target still
+        // fits in a 16-bit operand instead of silently truncating it.
+        bytecode.function_addresses["main"] = bytecode.code.size();
+        bytecode.patch_jump(jump_placeholder, bytecode.code.size());
 
         // Compile main body
         for (const auto& stmt : functions["main"]->body) {
