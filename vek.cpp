@@ -29,6 +29,14 @@ using std::ifstream;
 using std::stringstream;
 
 string read_file(const string& path) {
+    if (path.empty()) {
+        throw runtime_error("No file specified.");
+    }
+
+    if (fs::exists(path) && fs::is_directory(path)) {
+        throw runtime_error("Expected a file, got a directory: " + path);
+    }
+
     ifstream file(path);
     if (!file.is_open()) {
         throw runtime_error("Can't open file: " + path);
@@ -39,14 +47,17 @@ string read_file(const string& path) {
     return buffer.str();
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        cerr << "====================================================" << endl;
-        cerr << "Usage:" << endl;
-        cerr << "vek build <file.vek> - Compile for release" << endl;
-        cerr << "vek run <file.vek>   - Run development version" << endl;
-        cerr << "====================================================" << endl;
+static void print_usage() {
+    cerr << "====================================================" << endl;
+    cerr << "Usage:" << endl;
+    cerr << "vek build <file.vek> - Compile for release" << endl;
+    cerr << "vek run <file.vek>   - Run development version" << endl;
+    cerr << "====================================================" << endl;
+}
 
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        print_usage();
         return 1;
     }
 
