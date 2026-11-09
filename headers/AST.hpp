@@ -39,7 +39,7 @@ struct AssignExpr : Expr {
     unique_ptr<Expr> value;
 
     AssignExpr(string n, TokenType operation, unique_ptr<Expr> value)
-        : name(move(name)), op(operation), value(move(value)) {}
+        : name(move(n)), op(operation), value(move(value)) {}
 };
 
 struct CastExpr : Expr {

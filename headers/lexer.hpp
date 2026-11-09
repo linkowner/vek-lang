@@ -18,8 +18,10 @@ inline const unordered_map<std::string, TokenType> keywords = {
     {"load", TokenType::LOAD},
     {"class", TokenType::CLASS},
 
+    {"this", TokenType::THIS},
     {"public", TokenType::PUBLIC},
     {"private", TokenType::PRIVATE},
+    {"protected", TokenType::PROTECTED},
 
     {"let", TokenType::LET},
     {"const", TokenType::CONST},

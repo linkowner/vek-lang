@@ -266,14 +266,17 @@ public:
                 case OpCode::OP_LOAD: {
                     uint8_t name_index = bytecode.code[ip++];
                     string var_name = get<string>(bytecode.constants[name_index]);
-                    for (int i = scopes.size() - 1; i >= 0; i--) {
-                        if (scopes[i].find(var_name) != scopes[i].end()) {
-                            push(scopes[i][var_name]);
-                            goto load_done;
+                    int i = (int)scopes.size() - 1;
+                    for (; i >= 0; i--) {
+                        auto it = scopes[i].find(var_name);
+                        if (it != scopes[i].end()) {
+                            push(it->second);
+                            break;
                         }
                     }
-                    throw runtime_error("Undefined variable '" + var_name + "'");
-                    load_done:
+                    if (i < 0) {
+                        throw runtime_error("Undefined variable '" + var_name + "'");
+                    }
                     break;
                 }
                 case OpCode::OP_CAST: {
