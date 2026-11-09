@@ -26,7 +26,9 @@ private:
 
     vector<Value> stack;
     vector<unordered_map<string, Value>> scopes;
+    
     vector<size_t> call_stack;
+    vector<size_t> scope_base_stack;
 
     void push(Value val) {
         if (stack.size() >= STACK_SIZE) throw runtime_error("Stack overflow!");
@@ -416,6 +418,7 @@ public:
                     uint8_t arg_count = bytecode.code[ip++];
                     string func_name = get<string>(bytecode.constants[name_index]);
                     call_stack.push_back(ip);
+                    scope_base_stack.push_back(scopes.size());
                     scopes.push_back({});
                     if (bytecode.function_addresses.find(func_name) == bytecode.function_addresses.end()) throw runtime_error("Undefined function");
                     ip = bytecode.function_addresses.at(func_name);
@@ -426,6 +429,12 @@ public:
                         ip = call_stack.back();
                         call_stack.pop_back();
                         scopes.pop_back();
+
+                        size_t base = scope_base_stack.back();
+                        scope_base_stack.pop_back();
+                        while (scopes.size() > base) {
+                            scopes.pop_back();
+                        }
                     } else return;
                     break;
                 }

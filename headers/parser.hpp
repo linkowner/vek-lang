@@ -5,7 +5,7 @@
 #include <vector>
 #include <memory>
 #include "token.hpp"
-#include "ast.hpp"
+#include "AST.hpp"
 
 using std::runtime_error;
 using std::vector;

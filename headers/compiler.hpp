@@ -9,7 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include "ast.hpp"
+#include "AST.hpp"
 #include "bytecode.hpp"
 #include "token.hpp"
 
