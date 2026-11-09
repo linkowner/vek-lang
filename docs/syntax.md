@@ -17,6 +17,13 @@ let int last = scores.pop();
 
 Arrays can also declare a fixed initial size with `let int values[3];`. Index an array with square brackets, for example `scores[0]`.
 
+`.length()` returns the element count of an array or the character count of a string as an `int`.
+
+```cpp
+print(scores.length());   // 4
+print("Vek".length());    // 3
+```
+
 ## Control flow
 
 Use `if`, `else if`, and `else` with braces around each block.

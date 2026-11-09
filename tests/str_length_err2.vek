@@ -1,0 +1,5 @@
+func main() int {
+    let int x = 5;
+    print(x.length());
+    ret 0;
+}

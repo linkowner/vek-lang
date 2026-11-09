@@ -69,6 +69,20 @@ private:
         return "null";
     }
 
+    // Human-readable type name of a runtime value, used in error messages
+    string value_type_name(const Value& v) {
+        if (holds_alternative<std::monostate>(v)) return "null";
+        if (holds_alternative<string>(v)) return "string";
+        if (holds_alternative<shared_ptr<ArrayObject>>(v)) return "array";
+        if (holds_alternative<bool>(v)) return "bool";
+        if (holds_alternative<char>(v)) return "char";
+        if (holds_alternative<int32_t>(v)) return "int32";
+        if (holds_alternative<int64_t>(v)) return "int64";
+        if (holds_alternative<float>(v)) return "float32";
+        if (holds_alternative<double>(v)) return "float64";
+        return "unknown";
+    }
+
     struct MathValues {
         bool is_float;
         long long i_left, i_right;
@@ -409,6 +423,21 @@ public:
                     Value popped = arr->elements.back();
                     arr->elements.pop_back();
                     push(popped);
+                    break;
+                }
+
+                // Strings
+                case OpCode::OP_STR_LENGTH: {
+                    Value val = pop();
+                    if (holds_alternative<string>(val)) {
+                        push((int64_t)get<string>(val).size());
+                    } else if (holds_alternative<shared_ptr<ArrayObject>>(val)) {
+                        auto arr = get<shared_ptr<ArrayObject>>(val);
+                        if (!arr) throw runtime_error("length() called on a null array");
+                        push((int64_t)arr->elements.size());
+                    } else {
+                        throw runtime_error("length() expects a string or array, got " + value_type_name(val));
+                    }
                     break;
                 }
 

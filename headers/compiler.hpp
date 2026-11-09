@@ -446,20 +446,32 @@ private:
         }
 
         if (auto* method_call = dynamic_cast<MethodCallExpr*>(expr)) {
-            compile_expr(method_call->object.get(), bytecode, Type::ARRAY);
-            for (const auto& arg : method_call->arguments) {
-                compile_expr(arg.get(), bytecode, Type::UNKNOWN);
+            // Dispatch on the method name: strings and arrays share the method-call
+            // syntax and the object is an arbitrary expression with no static type
+            // here, so "length" emits OP_STR_LENGTH and lets the VM check the actual
+            // runtime type. A real type system would resolve this statically.
+            if (method_call->method == "length") {
+                if (!method_call->arguments.empty()) throw runtime_error("length expects 0 arguments");
+                compile_expr(method_call->object.get(), bytecode, Type::UNKNOWN);
+                bytecode.emit(OpCode::OP_STR_LENGTH);
+                // OP_STR_LENGTH always pushes an int64
+                return Type::INT64;
             }
-            if (method_call->method == "push") {
+            else if (method_call->method == "push") {
+                compile_expr(method_call->object.get(), bytecode, Type::ARRAY);
+                for (const auto& arg : method_call->arguments) {
+                    compile_expr(arg.get(), bytecode, Type::UNKNOWN);
+                }
                 if (method_call->arguments.size() != 1) throw runtime_error("push expects 1 argument");
                 bytecode.emit(OpCode::OP_ARRAY_PUSH);
             } 
             else if (method_call->method == "pop") {
+                compile_expr(method_call->object.get(), bytecode, Type::ARRAY);
                 if (!method_call->arguments.empty()) throw runtime_error("pop expects 0 arguments");
                 bytecode.emit(OpCode::OP_ARRAY_POP);
             } 
             else {
-                throw runtime_error("Unknown array method: " + method_call->method);
+                throw runtime_error("Unknown method: " + method_call->method);
             }
             return Type::UNKNOWN;
         }

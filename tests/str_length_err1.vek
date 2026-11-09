@@ -1,0 +1,5 @@
+func main() int {
+    let str s = "abc";
+    print(s.length(1));
+    ret 0;
+}

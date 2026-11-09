@@ -64,6 +64,11 @@ enum class OpCode {
     OP_ARRAY_PUSH = 0x43,
     OP_ARRAY_POP = 0x44,
 
+    // Strings
+    // Pops one value and pushes its length as int64:
+    // strings give the character count, arrays the element count.
+    OP_STR_LENGTH = 0x50,
+
     // End of code
     OP_HALT = 0xFF,
 };

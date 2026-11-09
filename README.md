@@ -28,7 +28,8 @@ You can see the docs [here](https://github.com/vek-language/vek-lang/tree/mavin/
 - [x] `while` and `for` loops
 - [x] `&&` and `||`
 - [ ] Structs / Classes
-- [ ] String manipulation methods (`.length()`, `.split()`)
+- [x] `.length()` on strings and arrays
+- [ ] `.split()` and other string manipulation methods
   
 **Code that shows capabilities (run with `./main {filename}.vek`)**
 ```cpp
