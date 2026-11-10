@@ -422,6 +422,10 @@ private:
         }
 
         if (auto* assign_expr = dynamic_cast<AssignExpr*>(expr)) {
+            if (is_constant(assign_expr->name)) {
+                throw runtime_error("Cannot reassign constant variable '" + assign_expr->name + "'");
+            }
+            
             int load_idx = bytecode.add_const(assign_expr->name);
             bytecode.emit(OpCode::OP_LOAD, load_idx);
             compile_expr(assign_expr->value.get(), bytecode, Type::UNKNOWN);

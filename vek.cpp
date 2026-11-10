@@ -40,7 +40,7 @@ string read_file(const string& path) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
+    if (argc < 3) {
         cerr << "====================================================" << endl;
         cerr << "Usage:" << endl;
         cerr << "vek build <file.vek> - Compile for release" << endl;
