@@ -69,6 +69,22 @@ private:
         return "null";
     }
 
+     bool is_truthy(const Value& v) {
+        if (holds_alternative<bool>(v)) return get<bool>(v);
+        if (holds_alternative<int32_t>(v)) return get<int32_t>(v) != 0;
+        if (holds_alternative<int64_t>(v)) return get<int64_t>(v) != 0;
+        if (holds_alternative<float>(v)) return get<float>(v) != 0.0f;
+        if (holds_alternative<double>(v)) return get<double>(v) != 0.0;
+        if (holds_alternative<char>(v)) return get<char>(v) != '\0';
+        if (holds_alternative<string>(v)) return !get<string>(v).empty();
+        if (holds_alternative<shared_ptr<ArrayObject>>(v)) {
+            const auto& arr = get<shared_ptr<ArrayObject>>(v);
+            return arr && !arr->elements.empty();
+        }
+        
+        return false;
+    }
+
     struct MathValues {
         bool is_float;
         long long i_left, i_right;
@@ -222,20 +238,7 @@ public:
                 }
 
                 case OpCode::OP_NOT: {
-                    Value a = pop();
-                    bool truthy = false;
-                    
-                    if (holds_alternative<bool>(a)) {
-                        truthy = get<bool>(a);
-                    } else if (holds_alternative<int64_t>(a)) {
-                        truthy = (get<int64_t>(a) != 0);
-                    } else if (holds_alternative<double>(a)) {
-                        truthy = (get<double>(a) != 0.0);
-                    } else {
-                        truthy = true;
-                    }
-                    
-                    push(!truthy);
+                    push(!is_truthy(pop()));
                     break;
                 }
 
@@ -318,15 +321,7 @@ public:
                     }
                     // To bool
                     else if (target_type == TokenType::BOOL) {
-                        bool result = false;
-                        if (holds_alternative<int32_t>(val)) result = (get<int32_t>(val) != 0);
-                        else if (holds_alternative<int64_t>(val)) result = (get<int64_t>(val) != 0);
-                        else if (holds_alternative<float>(val)) result = (get<float>(val) != 0.0f);
-                        else if (holds_alternative<double>(val)) result = (get<double>(val) != 0.0);
-                        else if (holds_alternative<bool>(val)) result = get<bool>(val);
-                        else if (holds_alternative<char>(val)) result = (get<char>(val) != '\0');
-                        
-                        push(result);
+                        push(is_truthy(val));
                     }
                     // To char
                     else if (target_type == TokenType::CHAR) {
@@ -448,40 +443,17 @@ public:
                 }
                 case OpCode::OP_JUMP_IF_FALSE: {
                     uint8_t high = bytecode.code[ip++];
-                    uint8_t low = bytecode.code[ip++];
+                    uint8_t low  = bytecode.code[ip++];
                     uint16_t target = (high << 8) | low;
-                    
-                    Value condition = pop();
-                    bool is_truthy = false;
-                    
-                    if (holds_alternative<bool>(condition)) is_truthy = get<bool>(condition);
-                    else if (holds_alternative<int64_t>(condition)) is_truthy = (get<int64_t>(condition) != 0);
-                    else if (holds_alternative<int32_t>(condition)) is_truthy = (get<int32_t>(condition) != 0);
-                    else if (holds_alternative<double>(condition)) is_truthy = (get<double>(condition) != 0.0);
-                    else if (holds_alternative<char>(condition)) is_truthy = (get<char>(condition) != '\0');
-                    
-                    if (!is_truthy) {
-                        ip = target;
-                    }
+                    if (!is_truthy(pop())) ip = target;
                     break;
                 }
+
                 case OpCode::OP_JUMP_IF_TRUE: {
                     uint8_t high = bytecode.code[ip++];
-                    uint8_t low = bytecode.code[ip++];
+                    uint8_t low  = bytecode.code[ip++];
                     uint16_t target = (high << 8) | low;
-                    
-                    Value condition = pop();
-                    bool is_truthy = false;
-                    
-                    if (holds_alternative<bool>(condition)) is_truthy = get<bool>(condition);
-                    else if (holds_alternative<int64_t>(condition)) is_truthy = (get<int64_t>(condition) != 0);
-                    else if (holds_alternative<int32_t>(condition)) is_truthy = (get<int32_t>(condition) != 0);
-                    else if (holds_alternative<double>(condition)) is_truthy = (get<double>(condition) != 0.0);
-                    else if (holds_alternative<char>(condition)) is_truthy = (get<char>(condition) != '\0');
-                    
-                    if (is_truthy) {
-                        ip = target;
-                    }
+                    if (is_truthy(pop())) ip = target;
                     break;
                 }
 

@@ -1,3 +1,6 @@
 *.exe
 *.vek
 *.vkc
+
+.idea/
+.vscode/
